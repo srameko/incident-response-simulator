@@ -229,7 +229,7 @@ header.bar{
   <div class="start-card">
     <div class="pulse"><span class="dot"></span> <span id="pulseText">SHIFT 03 · 22:00–06:00 · QUEUE LIVE</span></div>
     <h1 class="brand"><span id="brandTitle">Nightwatch</span><em id="brandSub">Alert triage practice for first-line SOC analysts</em></h1>
-    <p class="lede" id="lede">Twenty-three alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.</p>
+    <p class="lede" id="lede">Seven alerts are waiting tonight, drawn from a much bigger case file. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.</p>
 
     <label class="field" for="nameInput"><span id="nameLabel">What should the console call you?</span>
       <input id="nameInput" type="text" placeholder="e.g. Petra N." autocomplete="off" maxlength="24">
@@ -270,7 +270,7 @@ header.bar{
 
   <div class="wrap">
     <div class="strip">
-      <div class="stat"><b id="sClosed">0/23</b><span id="lblClosed">Cases closed</span></div>
+      <div class="stat"><b id="sClosed">0/7</b><span id="lblClosed">Cases closed</span></div>
       <div class="stat"><b id="sAcc">—</b><span id="lblAcc">Verdict accuracy</span></div>
       <div class="stat hot"><b id="sStreak">0</b><span id="lblStreak">Streak</span></div>
       <div class="stat"><b id="sScore">0</b><span id="lblScore">Score</span></div>
@@ -408,7 +408,7 @@ const UI = {
     pulse:'SHIFT 03 · 22:00–06:00 · QUEUE LIVE',
     brand:'Nightwatch',
     brandSub:'Alert triage practice for first-line SOC analysts',
-    lede:'Twenty-three alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.',
+    lede:'Seven alerts are waiting tonight, drawn from a much bigger case file. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.',
     nameLabel:'What should the console call you?',
     namePlaceholder:'e.g. Petra N.',
     startBtn:'Start the shift',
@@ -468,7 +468,7 @@ const UI = {
     pulse:'SMĚNA 03 · 22:00–06:00 · FRONTA ŽIVĚ',
     brand:'Nightwatch',
     brandSub:'Trénink triáže pro SOC analytiky první linie',
-    lede:'Čeká dvacet tři alertů. Přečti si důkazy, rozhodni, co se doopravdy děje, a podnikni jen ty reakce, které si situace zaslouží. Bodovaný je každý případ.',
+    lede:'Dnes v noci čeká sedm alertů, vybraných z mnohem větší sbírky případů. Přečti si důkazy, rozhodni, co se doopravdy děje, a podnikni jen ty reakce, které si situace zaslouží. Bodovaný je každý případ.',
     nameLabel:'Jak ti má konzole říkat?',
     namePlaceholder:'např. Petra N.',
     startBtn:'Začít směnu',
@@ -1555,12 +1555,23 @@ const ALERTS = [
 ];
 
 /* ---------- game state ---------- */
+const SHIFT_SIZE = 7;
 const S = {
   name:'', score:0, closed:0, correct:0, streak:0, best:0,
   keyFinds:0, cleanCases:0, fastCases:0,
   results:{}, badges:new Set(), current:null,
+  shift:[],  // this shift's assigned alerts — a random subset of ALERTS, picked once in start()
   draft:{}   // per alert: {assigned, enriched:Set, verdict, actions:Set, t0, extra}
 };
+
+function pickShift(){
+  const pool = [...ALERTS];
+  for(let i = pool.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, Math.min(SHIFT_SIZE, pool.length));
+}
 
 const RANKS = [
   [0,   { en:'Tier 1 Trainee',   cs:'Tier 1 stážista' }],
@@ -1593,6 +1604,7 @@ $('#nameInput').addEventListener('keydown', e => { if(e.key==='Enter') start(); 
 function start(){
   const v = $('#nameInput').value.trim();
   S.name = v || 'Analyst';
+  S.shift = pickShift();
   $('#start').hidden = true;
   $('#app').hidden = false;
   $('#whoName').textContent = S.name;
@@ -1604,7 +1616,7 @@ function start(){
 /* ---------- queue ---------- */
 function renderQueue(){
   const list = $('#qlist'); list.innerHTML = '';
-  ALERTS.forEach(a => {
+  S.shift.forEach(a => {
     const r = S.results[a.id];
     const b = el('button', 'alert' + (r ? ' done' : ''));
     b.style.setProperty('--sev', `var(--sev-${a.sev})`);
@@ -1635,7 +1647,7 @@ function renderCase(){
       <p>${u.caseEmptyHint}</p></div>`;
     return;
   }
-  const a = ALERTS.find(x => x.id === S.current);
+  const a = S.shift.find(x => x.id === S.current);
   const d = S.draft[a.id];
   const done = S.results[a.id];
 
@@ -1791,7 +1803,7 @@ function scoreCase(a){
   if(S.fastCases >= 3) give('fast');
   if(S.keyFinds >= 5) give('digger');
   if(S.cleanCases >= 6) give('proportionate');
-  if(S.closed === ALERTS.length) give('full_shift');
+  if(S.closed === S.shift.length) give('full_shift');
 
   S.results[a.id] = { score, verdictOk, perfect, ledger, secs, chosen, missed, bad, verdict:d.verdict };
 
@@ -1836,7 +1848,7 @@ function showDebrief(a, r, newBadges){
     </div>`;
 
   const foot = el('div','modal-foot');
-  const next = ALERTS.find(x => !S.results[x.id]);
+  const next = S.shift.find(x => !S.results[x.id]);
   const b1 = el('button','btn primary', next ? u.nextAlert : u.seeReport);
   b1.onclick = () => { root.innerHTML=''; next ? openCase(next.id) : showReport(); };
   const b2 = el('button','btn ghost',u.backToQueueBtn);
@@ -1856,7 +1868,7 @@ function showReport(){
   const u = T();
   const acc = S.closed ? Math.round(S.correct / S.closed * 100) : 0;
   const clean = S.closed ? Math.round(S.cleanCases / S.closed * 100) : 0;
-  const maxScore = ALERTS.length * 90;
+  const maxScore = S.shift.length * 90;
   const grade = S.score >= 700 ? u.gradeTop
               : S.score >= 520 ? u.gradeGood
               : S.score >= 340 ? u.gradeMid
@@ -1873,7 +1885,7 @@ function showReport(){
     </div>
     <div class="modal-body">
       <div class="bars">
-        ${bar(u.barClosed, S.closed, ALERTS.length, `${S.closed}/${ALERTS.length}`, 'var(--accent)')}
+        ${bar(u.barClosed, S.closed, S.shift.length, `${S.closed}/${S.shift.length}`, 'var(--accent)')}
         ${bar(u.barAcc, acc, 100, acc+'%', 'var(--good)')}
         ${bar(u.barClean, clean, 100, clean+'%', 'var(--sev-low)')}
         ${bar(u.barScore, S.score, maxScore, S.score+' '+u.xpUnit, 'var(--xp)')}
@@ -1885,8 +1897,8 @@ function showReport(){
       </div>
     </div>`;
   const foot = el('div','modal-foot');
-  const b1 = el('button','btn primary', S.closed < ALERTS.length ? u.backToQueueLong : u.freshShift);
-  b1.onclick = () => { root.innerHTML=''; if(S.closed >= ALERTS.length) location.reload(); else $('#grid').dataset.view='queue'; };
+  const b1 = el('button','btn primary', S.closed < S.shift.length ? u.backToQueueLong : u.freshShift);
+  b1.onclick = () => { root.innerHTML=''; if(S.closed >= S.shift.length) location.reload(); else $('#grid').dataset.view='queue'; };
   foot.appendChild(b1);
   m.appendChild(foot);
   scrim.appendChild(m);
@@ -1903,7 +1915,7 @@ function bar(label, val, max, txt, color){
 
 /* ---------- stats strip ---------- */
 function renderStats(){
-  $('#sClosed').textContent = `${S.closed}/${ALERTS.length}`;
+  $('#sClosed').textContent = `${S.closed}/${S.shift.length}`;
   $('#sAcc').textContent = S.closed ? Math.round(S.correct/S.closed*100) + '%' : '—';
   $('#sStreak').textContent = S.streak;
   $('#sScore').textContent = S.score;
