@@ -57,5 +57,6 @@ Action IDs come from the `ACTIONS` object — add new ones there and they appear
 ## Notes
 
 - Light and dark themes; follows the OS setting on first load, toggle in the header, choice remembered.
+- English and Czech; toggle next to the theme switch, choice remembered. Every alert carries a `cs` translation block alongside its English fields — add one when you add a new alert, or it just falls back to English.
 - Progress is per-browser-session and is not sent anywhere. Refreshing starts a new shift.
 - Keyboard accessible, responsive down to phone width, respects `prefers-reduced-motion`.

