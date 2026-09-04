@@ -1,6 +1,6 @@
 # Nightwatch — SOC Triage Simulator
 
-A single-file training simulator for first-line SOC analysts. Ten realistic alerts, one night shift.
+A single-file training simulator for first-line SOC analysts. 23 realistic alerts, one night shift.
 The learner types a name, works the queue, and gets scored on the verdict, the response actions taken,
 the actions they should *not* have taken, and how long the case took.
 
@@ -37,7 +37,7 @@ Everything lives in the `ALERTS` array in the `<script>` block. Copy one entry a
 
 ```js
 {
-  id:'ALT-4481', sev:'high',          // critical | high | medium | low
+  id:'ALT-9999', sev:'high',          // critical | high | medium | low
   target:140,                          // target handling time in seconds
   title:'…', source:'…', time:'02:15',
   entities:{ Host:'…', User:'…' },     // shown as case metadata

