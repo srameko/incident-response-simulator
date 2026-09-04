@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nightwatch — SOC Triage Simulator</title>
+<meta name="description" content="A hands-on training simulator for first-line SOC analysts: triage alerts, decide a verdict, take the right response actions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sev-critical:#E5484D; --sev-high:#F07C2A; --sev-medium:#D9A514; --sev-low:#4A8FD8;
+  --good:#22A06B; --bad:#E5484D; --xp:#E0A32E;
+  --radius:10px;
+  --font:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+html[data-theme="dark"]{
+  --bg:#121A29; --bg-deep:#0D1420; --surface:#1A2436; --surface-2:#212D42;
+  --line:#2E3C55; --line-soft:#243146;
+  --ink:#E7EDF8; --ink-2:#A8B6CE; --ink-3:#7387A3;
+  --accent:#2BB3A3; --accent-ink:#08201E;
+  --shadow:0 12px 28px rgba(0,0,0,.38);
+}
+html[data-theme="light"]{
+  --bg:#EEF2F8; --bg-deep:#E3E9F2; --surface:#FFFFFF; --surface-2:#F5F8FC;
+  --line:#CFD9E8; --line-soft:#E2E9F3;
+  --ink:#152134; --ink-2:#4A5B75; --ink-3:#74859E;
+  --accent:#0E8C7E; --accent-ink:#FFFFFF;
+  --shadow:0 10px 24px rgba(21,33,52,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--font);
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px 64px}
+
+/* ---------- start screen ---------- */
+#start{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.start-card{width:100%;max-width:520px}
+.pulse{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);
+  font-family:var(--mono);margin-bottom:22px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--sev-critical);
+  box-shadow:0 0 0 0 rgba(229,72,77,.6);animation:beat 2.2s infinite}
+@keyframes beat{0%{box-shadow:0 0 0 0 rgba(229,72,77,.55)}70%{box-shadow:0 0 0 12px rgba(229,72,77,0)}100%{box-shadow:0 0 0 0 rgba(229,72,77,0)}}
+h1.brand{font-size:clamp(38px,9vw,60px);line-height:1.02;margin:0 0 14px;letter-spacing:-.03em;font-weight:700}
+h1.brand em{font-style:normal;display:block;color:var(--ink-3);font-weight:500;font-size:.36em;letter-spacing:.01em;margin-top:12px}
+.lede{color:var(--ink-2);margin:0 0 26px;max-width:46ch}
+.field{display:block;margin-bottom:14px}
+.field span{display:block;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+input[type=text]{
+  width:100%;padding:13px 14px;border-radius:var(--radius);border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font-size:16px;font-family:inherit
+}
+input[type=text]::placeholder{color:var(--ink-3)}
+.btn{
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  padding:11px 16px;border-radius:var(--radius);font-weight:600;transition:.15s
+}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.wide{width:100%;padding:14px}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent}
+.rules{margin-top:26px;border-top:1px solid var(--line);padding-top:18px;color:var(--ink-2);font-size:14px}
+.rules ol{margin:10px 0 0;padding-left:20px}
+.rules li{margin-bottom:5px}
+.rules li b{color:var(--ink);font-weight:600}
+
+/* ---------- top bar ---------- */
+header.bar{
+  position:sticky;top:0;z-index:30;background:var(--bg-deep);
+  border-bottom:1px solid var(--line);
+}
+.bar-in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.avatar{width:36px;height:36px;border-radius:9px;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-weight:700;flex:none}
+.who b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw}
+.who small{color:var(--ink-3);font-size:12px}
+.xpwrap{flex:1;min-width:150px}
+.xprow{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:4px;font-family:var(--mono)}
+.xpbar{height:6px;background:var(--line-soft);border-radius:99px;overflow:hidden}
+.xpfill{height:100%;background:var(--xp);width:0;transition:width .5s ease}
+.tools{display:flex;gap:8px;margin-left:auto}
+.icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:9px;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.icon-btn:hover{border-color:var(--accent)}
+
+/* ---------- stats strip ---------- */
+.strip{display:flex;gap:10px;overflow-x:auto;padding:16px 0 4px;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.stat{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--radius);
+  padding:10px 14px;flex:none;min-width:96px}
+.stat b{display:block;font-size:20px;font-weight:700;line-height:1.2}
+.stat span{font-size:11.5px;color:var(--ink-3)}
+.stat.hot b{color:var(--xp)}
+
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:340px 1fr;gap:16px;margin-top:12px;align-items:start}
+@media (max-width:900px){
+  .grid{grid-template-columns:1fr}
+  .grid[data-view="case"] .queue{display:none}
+  .grid[data-view="queue"] .case{display:none}
+}
+@media (min-width:901px){.backlink{display:none}}
+
+/* ---------- queue ---------- */
+.queue h2,.case h2{font-size:13px;color:var(--ink-3);margin:0 0 10px;font-weight:600}
+.qlist{display:flex;flex-direction:column;gap:8px}
+.alert{
+  width:100%;text-align:left;background:var(--surface);border:1px solid var(--line-soft);
+  border-left:4px solid var(--sev);border-radius:var(--radius);padding:11px 13px;transition:.15s;color:inherit
+}
+.alert:hover{border-color:var(--line);transform:translateX(2px)}
+.alert[aria-current="true"]{border-color:var(--accent);background:var(--surface-2)}
+.alert.done{opacity:.5}
+.alert .top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.sev{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--sev);font-family:var(--mono)}
+.aid{font-size:10.5px;color:var(--ink-3);font-family:var(--mono);margin-left:auto}
+.alert h3{margin:0;font-size:14.5px;font-weight:600;line-height:1.35}
+.alert p{margin:4px 0 0;font-size:12.5px;color:var(--ink-3);font-family:var(--mono)}
+.tick{margin-left:6px;color:var(--good);font-weight:700}
+.tick.miss{color:var(--sev-high)}
+
+/* ---------- case panel ---------- */
+.case{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden}
+.case-head{padding:18px;border-bottom:1px solid var(--line-soft)}
+.backlink{background:none;border:none;color:var(--ink-2);padding:0 0 10px;font-size:13px}
+.case-head .sev{font-size:11px}
+.case-head h2{color:var(--ink);font-size:20px;margin:6px 0 8px;font-weight:700;line-height:1.25}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.meta b{color:var(--ink-2);font-weight:500}
+.sect{padding:18px;border-bottom:1px solid var(--line-soft)}
+.sect:last-child{border-bottom:none}
+.sect > h3{margin:0 0 4px;font-size:15px;font-weight:600}
+.hint{margin:0 0 12px;font-size:13px;color:var(--ink-3)}
+.log{background:var(--bg-deep);border:1px solid var(--line-soft);border-radius:var(--radius);
+  padding:12px;font-family:var(--mono);font-size:12.5px;line-height:1.65;overflow-x:auto}
+.log div{white-space:pre-wrap;word-break:break-word}
+.log .k{color:var(--ink-3)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+  padding:9px 12px;border-radius:99px;font-size:13.5px;transition:.15s}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.chip.used{opacity:.55;pointer-events:none}
+.chip small{opacity:.7;font-family:var(--mono);font-size:11px;margin-left:4px}
+.finding{margin-top:10px;border-left:3px solid var(--accent);background:var(--surface-2);
+  padding:10px 12px;border-radius:0 var(--radius) var(--radius) 0;font-size:13.5px}
+.finding b{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);display:block;margin-bottom:3px;font-weight:500}
+.opts{display:grid;gap:8px}
+@media (min-width:620px){.opts{grid-template-columns:repeat(3,1fr)}}
+.opt{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+  padding:12px;border-radius:var(--radius);text-align:left;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.opt b{display:block;font-size:14px;margin-bottom:2px}
+.opt span{font-size:12px;opacity:.75}
+.actions{display:grid;gap:8px}
+@media (min-width:620px){.actions{grid-template-columns:1fr 1fr}}
+.act{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);
+  background:var(--surface-2);border-radius:var(--radius);padding:11px 12px;text-align:left;color:inherit;transition:.15s}
+.act:hover{border-color:var(--accent)}
+.act .box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--ink-3);flex:none;margin-top:1px;
+  display:grid;place-items:center;font-size:12px;color:transparent}
+.act[aria-pressed="true"]{border-color:var(--accent)}
+.act[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.act b{display:block;font-size:13.5px;font-weight:600}
+.act span{font-size:12px;color:var(--ink-3)}
+.footer-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.timer{font-family:var(--mono);font-size:13px;color:var(--ink-3);margin-left:auto}
+.locked{padding:34px 18px;text-align:center;color:var(--ink-3)}
+.empty{padding:44px 18px;text-align:center}
+.empty h3{margin:0 0 6px;font-size:17px;color:var(--ink)}
+.empty p{margin:0;color:var(--ink-3);font-size:14px}
+
+/* ---------- debrief modal ---------- */
+.scrim{position:fixed;inset:0;background:rgba(6,10,18,.66);display:grid;place-items:center;
+  padding:16px;z-index:60;backdrop-filter:blur(3px)}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+  width:100%;max-width:560px;max-height:88dvh;overflow-y:auto}
+.modal-head{padding:20px 20px 0}
+.modal-head h2{margin:0 0 4px;font-size:22px}
+.verdict-line{font-family:var(--mono);font-size:12.5px;color:var(--ink-3)}
+.score-big{font-size:44px;font-weight:700;letter-spacing:-.02em;margin:14px 0 2px}
+.modal-body{padding:8px 20px 20px}
+.ledger{list-style:none;margin:14px 0;padding:0;border-top:1px solid var(--line-soft)}
+.ledger li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px;align-items:baseline}
+.ledger .pts{margin-left:auto;font-family:var(--mono);font-weight:600;flex:none}
+.ledger .plus{color:var(--good)} .ledger .minus{color:var(--bad)}
+.note{background:var(--surface-2);border-radius:var(--radius);padding:13px;font-size:13.5px;color:var(--ink-2)}
+.note b{color:var(--ink)}
+.badges{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.badge{background:var(--surface-2);border:1px solid var(--xp);color:var(--ink);border-radius:99px;
+  padding:6px 12px;font-size:12.5px;font-weight:600}
+.badge.locked{border-color:var(--line);color:var(--ink-3);font-weight:400;opacity:.6}
+.modal-foot{padding:0 20px 20px;display:flex;gap:10px}
+
+/* ---------- report ---------- */
+.rank{font-size:clamp(30px,7vw,44px);font-weight:700;letter-spacing:-.02em;margin:6px 0 0}
+.bars{margin:18px 0}
+.bars .row{margin-bottom:12px}
+.bars .lab{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.bars .track{height:8px;background:var(--line-soft);border-radius:99px;overflow:hidden}
+.bars .fill{height:100%;border-radius:99px}
+</style>
+</head>
+<body>
+
+<!-- ============ START ============ -->
+<section id="start">
+  <div class="start-card">
+    <div class="pulse"><span class="dot"></span> SHIFT 03 · 22:00–06:00 · QUEUE LIVE</div>
+    <h1 class="brand">Nightwatch<em>Alert triage practice for first-line SOC analysts</em></h1>
+    <p class="lede">Ten alerts are waiting. Read the evidence, decide what is really happening, and take only the response actions the situation deserves. You get scored on every one.</p>
+
+    <label class="field" for="nameInput"><span>What should the console call you?</span>
+      <input id="nameInput" type="text" placeholder="e.g. Petra N." autocomplete="off" maxlength="24">
+    </label>
+    <button class="btn primary wide" id="startBtn">Start the shift</button>
+
+    <div class="rules">
+      How a case works
+      <ol>
+        <li><b>Assign</b> it to yourself — nobody else is touching your queue.</li>
+        <li><b>Investigate.</b> Enrichment lookups reveal more, but each one costs you time.</li>
+        <li><b>Call the verdict:</b> true positive, false positive, or authorised activity.</li>
+        <li><b>Respond.</b> Missing a needed action hurts. So does overreacting.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<main id="app" hidden>
+  <header class="bar">
+    <div class="bar-in">
+      <div class="who">
+        <div class="avatar" id="avatar">?</div>
+        <div><b id="whoName">Analyst</b><small id="whoRank">Tier 1 Trainee</small></div>
+      </div>
+      <div class="xpwrap">
+        <div class="xprow"><span id="xpLabel">0 XP</span><span id="xpNext">150 to next</span></div>
+        <div class="xpbar"><div class="xpfill" id="xpFill"></div></div>
+      </div>
+      <div class="tools">
+        <button class="icon-btn" id="themeBtn" title="Switch theme" aria-label="Switch colour theme">◐</button>
+        <button class="icon-btn" id="statsBtn" title="Shift report" aria-label="Open shift report">▤</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="strip">
+      <div class="stat"><b id="sClosed">0/10</b><span>Cases closed</span></div>
+      <div class="stat"><b id="sAcc">—</b><span>Verdict accuracy</span></div>
+      <div class="stat hot"><b id="sStreak">0</b><span>Streak</span></div>
+      <div class="stat"><b id="sScore">0</b><span>Score</span></div>
+      <div class="stat"><b id="sBadges">0</b><span>Badges</span></div>
+    </div>
+
+    <div class="grid" id="grid" data-view="queue">
+      <section class="queue">
+        <h2>Alert queue</h2>
+        <div class="qlist" id="qlist"></div>
+      </section>
+      <section class="case" id="case"></section>
+    </div>
+  </div>
+</main>
+
+<div id="modalRoot"></div>
+
+<script>
+/* ============================================================
+   Nightwatch — SOC triage simulator
+   Static, no backend. Progress is kept in this browser only.
+   ============================================================ */
+
+/* ---------- storage (guarded: some sandboxes block it) ---------- */
+const mem = {};
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return mem[k] ?? null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){ mem[k]=v; } }
+};
+
+/* ---------- theme ---------- */
+(function initTheme(){
+  const saved = store.get('nw_theme');
+  const sys = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  document.documentElement.dataset.theme = saved || sys;
+})();
+document.getElementById('themeBtn').onclick = () => {
+  const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = t;
+  store.set('nw_theme', t);
+};
+
+/* ---------- response action catalogue ---------- */
+const ACTIONS = {
+  isolate_host:     { label:'Isolate host',            desc:'Cut the machine off the network via EDR' },
+  disable_account:  { label:'Disable account',         desc:'Block all sign-ins for the identity' },
+  reset_password:   { label:'Force password reset',    desc:'Invalidate the current credential' },
+  revoke_sessions:  { label:'Revoke sessions & tokens',desc:'Kill live sessions, refresh tokens, app passwords' },
+  block_indicator:  { label:'Block the indicator',     desc:'Sinkhole the domain / drop the IP at the edge' },
+  quarantine_file:  { label:'Quarantine the file',     desc:'Pull the binary or attachment out of reach' },
+  collect_forensics:{ label:'Collect forensic triage', desc:'Memory, MFT, event logs — before anything is lost' },
+  notify_user:      { label:'Contact the user',        desc:'Verify the activity with the human behind it' },
+  notify_hr_legal:  { label:'Involve HR & legal',      desc:'Bring in the people who own employment matters' },
+  escalate_ir:      { label:'Escalate to IR on-call',  desc:'Page tier 3 — this is bigger than a ticket' },
+  add_watchlist:    { label:'Add to watchlist',        desc:'Raise monitoring on the entity for 14 days' },
+  tune_rule:        { label:'Tune the detection',      desc:'Refine the rule so this stops firing' },
+  close_no_action:  { label:'Close, no action needed', desc:'Nothing to contain here' }
+};
+
+const VERDICTS = {
+  true_positive:    { label:'True positive',  desc:'Real malicious activity' },
+  false_positive:   { label:'False positive', desc:'Detection logic was wrong' },
+  benign:           { label:'Authorised',     desc:'Real activity, but approved' }
+};
+
+/* ---------- the alert set ---------- */
+const ALERTS = [
+{
+  id:'ALT-4471', sev:'critical', target:150,
+  title:'Shadow copies deleted on a finance workstation',
+  source:'EDR · Behavioural detection', time:'23:14',
+  entities:{ Host:'FIN-WS-014', User:'m.dvorak', Process:'vssadmin.exe' },
+  summary:'A process chain starting from a macro-enabled spreadsheet ended with the deletion of all volume shadow copies. Three minutes later the same host began writing files with a new extension across the finance share.',
+  evidence:[
+    ['23:11:02','EXCEL.EXE → cmd.exe → powershell.exe -nop -w hidden'],
+    ['23:13:47','vssadmin.exe delete shadows /all /quiet'],
+    ['23:14:05','bcdedit /set recoveryenabled No'],
+    ['23:17:20','1,840 files renamed *.xlsx → *.xlsx.l0ckd on \\\\fs01\\finance']
+  ],
+  enrich:[
+    { id:'e1', label:'Check file share write volume', cost:20, key:true,
+      result:'Encryption is live and spreading: 1,840 files in three minutes, all from FIN-WS-014.' },
+    { id:'e2', label:'Look up the parent document', cost:20,
+      result:'The spreadsheet arrived 40 minutes earlier as an email attachment from an external sender.' },
+    { id:'e3', label:'Check the user’s working hours', cost:20,
+      result:'m.dvorak normally works 08:00–17:00 and is not logged in interactively right now.' }
+  ],
+  verdict:'true_positive',
+  required:['isolate_host','collect_forensics','escalate_ir'],
+  ok:['quarantine_file','disable_account','block_indicator'],
+  forbidden:['tune_rule','close_no_action','notify_user'],
+  debrief:'Ransomware in the encryption phase. Containment beats investigation here: isolate the host first, then preserve volatile evidence, then wake up IR. Never sit on this one to finish your notes.'
+},
+{
+  id:'ALT-4472', sev:'high', target:150,
+  title:'Credentials submitted to a fake Microsoft login page',
+  source:'Secure web gateway · Phishing category', time:'23:31',
+  entities:{ User:'l.kralova', Domain:'login-microsft365-verify[.]com', Src:'10.14.2.87' },
+  summary:'A user followed a link from a "shared document" email and POSTed form data to a newly registered domain that mimics the Microsoft 365 sign-in page.',
+  evidence:[
+    ['23:29:41','GET  login-microsft365-verify[.]com/auth  (referrer: outlook.office.com)'],
+    ['23:30:12','POST login-microsft365-verify[.]com/auth  content-length: 214'],
+    ['23:30:58','Azure AD: successful sign-in for l.kralova from 45.147.x.x (ASN: hosting provider)'],
+    ['23:31:04','Azure AD: new mailbox rule created — move messages containing "invoice" to RSS Feeds']
+  ],
+  enrich:[
+    { id:'e1', label:'Check sign-ins after the POST', cost:20, key:true,
+      result:'The attacker is already in: a sign-in from a hosting-provider IP succeeded and an inbox rule was created to hide invoice mail.' },
+    { id:'e2', label:'Check domain registration date', cost:20,
+      result:'The domain was registered two days ago behind privacy protection.' },
+    { id:'e3', label:'Search the mail gateway for the same link', cost:20,
+      result:'Eleven more users received the same message. Two clicked.' }
+  ],
+  verdict:'true_positive',
+  required:['reset_password','revoke_sessions','block_indicator'],
+  ok:['notify_user','add_watchlist','collect_forensics','escalate_ir','disable_account'],
+  forbidden:['tune_rule','close_no_action','isolate_host'],
+  debrief:'Account takeover, not host compromise — so isolating the laptop achieves nothing. A password reset alone is not enough either: without revoking sessions and tokens the attacker keeps their stolen session. Reset, revoke, block the domain, and go hunting for that inbox rule.'
+},
+{
+  id:'ALT-4473', sev:'high', target:130,
+  title:'Impossible travel: Prague to Singapore in 22 minutes',
+  source:'Identity protection · Risk detection', time:'00:07',
+  entities:{ User:'j.benes', 'Location A':'Prague, CZ', 'Location B':'Singapore, SG' },
+  summary:'Two successful sign-ins for the same account from locations that cannot be reached in the time between them.',
+  evidence:[
+    ['23:45:10','Sign-in success · Prague, CZ · 89.24.x.x · Windows / Edge'],
+    ['00:07:33','Sign-in success · Singapore, SG · 137.132.x.x · Windows / Edge'],
+    ['00:07:33','MFA satisfied by compliant device claim, same device ID as 23:45'],
+    ['00:08:01','No unusual mailbox or file activity recorded']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the corporate VPN logs', cost:20, key:true,
+      result:'The user connected to the Singapore VPN concentrator at 00:06 — the company reroutes APAC traffic through it during EU night maintenance.' },
+    { id:'e2', label:'Compare device IDs', cost:20,
+      result:'Both sign-ins come from the same managed, compliant device with the same hardware ID.' },
+    { id:'e3', label:'Contact the user’s manager', cost:30,
+      result:'Manager confirms j.benes is in Prague and working late on a release.' }
+  ],
+  verdict:'false_positive',
+  required:['tune_rule','close_no_action'],
+  ok:['add_watchlist'],
+  forbidden:['disable_account','reset_password','isolate_host','revoke_sessions','escalate_ir','notify_hr_legal'],
+  debrief:'Same device, same session, corporate VPN egress in Singapore. Locking out an engineer at midnight over a geo-IP artifact is a real cost to the business — and the rule needs a VPN exclusion so the next analyst does not lose twenty minutes on it too.'
+},
+{
+  id:'ALT-4474', sev:'medium', target:120,
+  title:'Password spraying against the VPN portal',
+  source:'Firewall · Authentication logs', time:'00:52',
+  entities:{ Src:'193.32.x.x', Target:'vpn.corp.local', Attempts:'4,182' },
+  summary:'A single external address tried one common password against thousands of usernames over ninety minutes. Every attempt failed.',
+  evidence:[
+    ['23:20:00','First failed auth from 193.32.x.x'],
+    ['00:50:00','4,182 failed authentications, 3,904 distinct usernames'],
+    ['00:50:00','0 successful authentications'],
+    ['00:51:12','Source ASN flagged as bulletproof hosting in threat intel feed']
+  ],
+  enrich:[
+    { id:'e1', label:'Confirm no successful logins', cost:20, key:true,
+      result:'Zero successes. Account lockout policy held and MFA is enforced on the portal.' },
+    { id:'e2', label:'Check the username list pattern', cost:20,
+      result:'Usernames follow the firstname.lastname format — likely scraped from LinkedIn, not stolen from an internal source.' },
+    { id:'e3', label:'Search intel for the source IP', cost:20,
+      result:'The address appears in three public feeds for credential stuffing over the last week.' }
+  ],
+  verdict:'true_positive',
+  required:['block_indicator','add_watchlist'],
+  ok:['tune_rule','notify_user'],
+  forbidden:['isolate_host','disable_account','close_no_action','reset_password','notify_hr_legal'],
+  debrief:'Malicious, but unsuccessful. Real activity with no impact is still a true positive — block the source, keep watching in case they rotate addresses, and resist disabling thousands of accounts that were never actually compromised.'
+},
+{
+  id:'ALT-4475', sev:'high', target:140,
+  title:'MFA push flood on a director’s account',
+  source:'Identity protection · MFA telemetry', time:'01:26',
+  entities:{ User:'p.ambrozova', Pushes:'61', Result:'1 approved' },
+  summary:'Sixty-one authentication prompts were sent to one user in eleven minutes. The last one was approved.',
+  evidence:[
+    ['01:14:02','Push #1 — denied'],
+    ['01:14:00–01:25:40','Pushes #2–#60 — denied or expired'],
+    ['01:25:51','Push #61 — APPROVED · sign-in from 185.220.x.x (Tor exit node)'],
+    ['01:26:30','Registration of a new authenticator app on the account']
+  ],
+  enrich:[
+    { id:'e1', label:'Check what happened after approval', cost:20, key:true,
+      result:'The attacker registered their own MFA method — they can now sign in without bothering the user again.' },
+    { id:'e2', label:'Check the source IP reputation', cost:20,
+      result:'The address is a known Tor exit node, never seen before on this tenant.' },
+    { id:'e3', label:'Call the user', cost:30,
+      result:'She says her phone would not stop buzzing and she tapped approve to make it stop. She is not signing in.' }
+  ],
+  verdict:'true_positive',
+  required:['revoke_sessions','reset_password','notify_user'],
+  ok:['disable_account','add_watchlist','escalate_ir','block_indicator'],
+  forbidden:['tune_rule','close_no_action','isolate_host'],
+  debrief:'The credential was already stolen; the flood was only about the second factor. Revoke sessions, reset the password, and remove that rogue authenticator — and talk to the user, because "approve to make it stop" is the pattern you want to break tenant-wide.'
+},
+{
+  id:'ALT-4476', sev:'high', target:160,
+  title:'Bulk upload to personal cloud storage by a leaving employee',
+  source:'DLP · Egress monitoring', time:'02:03',
+  entities:{ User:'r.stastny', Volume:'8.4 GB', Destination:'Personal Google Drive' },
+  summary:'An account in its notice period uploaded the contents of the customer pricing folder to a personal cloud account outside working hours.',
+  evidence:[
+    ['01:38:11','Access to \\\\fs01\\sales\\pricing-2026 (first access by this user in 9 months)'],
+    ['01:44:02','8.4 GB uploaded to drive.google.com under a non-corporate account'],
+    ['01:52:40','USB mass storage device connected, 2.1 GB written'],
+    ['02:03:00','HR record: last working day is in 6 days']
+  ],
+  enrich:[
+    { id:'e1', label:'Check what was in the folder', cost:20, key:true,
+      result:'Customer contract pricing, discount matrices and the FY26 target list — the crown jewels of the sales org.' },
+    { id:'e2', label:'Check for prior similar activity', cost:20,
+      result:'Two smaller uploads happened in the previous week, both after 22:00.' },
+    { id:'e3', label:'Check whether an exception exists', cost:20,
+      result:'No approved data-transfer exception exists for this account.' }
+  ],
+  verdict:'true_positive',
+  required:['collect_forensics','notify_hr_legal','escalate_ir'],
+  ok:['disable_account','add_watchlist','revoke_sessions'],
+  forbidden:['notify_user','close_no_action','tune_rule'],
+  debrief:'Insider cases are evidence cases. Preserve first, then hand it to HR and legal, who own what happens next — and do not contact the employee. A warning tips them off and destroys both the evidence and any chance of a clean process.'
+},
+{
+  id:'ALT-4477', sev:'medium', target:110,
+  title:'Hacking tool detected on an IT admin laptop',
+  source:'Antivirus · Signature match HackTool/Mimikatz', time:'02:41',
+  entities:{ Host:'IT-LT-006', User:'t.horak', File:'mimikatz.exe' },
+  summary:'A credential dumping tool was found in a folder on a laptop belonging to the internal penetration testing team.',
+  evidence:[
+    ['02:40:55','AV signature match: HackTool/Mimikatz in C:\\pentest\\tools\\'],
+    ['02:40:55','File not executed — detected on write from an internal file share'],
+    ['02:41:10','Host is in the AD group "SEC-PENTEST-ENDPOINTS"'],
+    ['02:41:10','No outbound connections from the host in the last hour']
+  ],
+  enrich:[
+    { id:'e1', label:'Check the internal exception register', cost:20, key:true,
+      result:'An approved, signed exception covers pentest tooling on this device group until December.' },
+    { id:'e2', label:'Check whether the file ran', cost:20,
+      result:'No execution, no LSASS access, no child processes. The file was only copied to disk.' },
+    { id:'e3', label:'Check the engagement calendar', cost:20,
+      result:'An internal red team engagement is scheduled to start this week.' }
+  ],
+  verdict:'benign',
+  required:['close_no_action','tune_rule'],
+  ok:['notify_user','add_watchlist'],
+  forbidden:['isolate_host','disable_account','escalate_ir','notify_hr_legal','reset_password'],
+  debrief:'The tool is genuinely malicious software — the detection was correct, so this is not a false positive. It is authorised activity, which is a different call: verify the exception, document it, and scope the rule to the pentest device group.'
+},
+{
+  id:'ALT-4478', sev:'critical', target:160,
+  title:'Encoded PowerShell beaconing to an unknown host',
+  source:'EDR + Network · Correlated detection', time:'03:19',
+  entities:{ Host:'HR-WS-021', User:'k.novotna', C2:'update-svc[.]xyz' },
+  summary:'A base64-encoded PowerShell command launched from a Word document, followed by regular outbound connections at fixed intervals.',
+  evidence:[
+    ['03:02:44','WINWORD.EXE → powershell.exe -enc SQBFAFgAIAAoAE4AZQB3...'],
+    ['03:03:01','Scheduled task created: "MicrosoftEdgeUpdateTaskCore"'],
+    ['03:05:00','Outbound to update-svc[.]xyz every 60s ±3s, 412 bytes each'],
+    ['03:18:55','net group "Domain Admins" /domain executed']
+  ],
+  enrich:[
+    { id:'e1', label:'Decode the PowerShell command', cost:20, key:true,
+      result:'It downloads and runs a second-stage payload in memory from update-svc[.]xyz.' },
+    { id:'e2', label:'Check the beacon pattern', cost:20,
+      result:'Fixed 60-second interval with small jitter and constant packet size — textbook command-and-control.' },
+    { id:'e3', label:'Check for lateral movement', cost:20,
+      result:'The host has started enumerating domain admins. No successful lateral authentication yet.' }
+  ],
+  verdict:'true_positive',
+  required:['isolate_host','block_indicator','collect_forensics','escalate_ir'],
+  ok:['reset_password','revoke_sessions','disable_account','add_watchlist'],
+  forbidden:['tune_rule','close_no_action','notify_user'],
+  debrief:'Active command-and-control with the operator already enumerating privileged groups. Isolate before they move laterally, cut the C2 at the edge, preserve memory while the implant is still resident, and escalate — this is an incident, not a ticket.'
+},
+{
+  id:'ALT-4479', sev:'critical', target:150,
+  title:'Service account created a new domain administrator',
+  source:'Active Directory · Audit log', time:'04:12',
+  entities:{ Account:'svc-backup', 'New user':'adm_support01', Group:'Domain Admins' },
+  summary:'A backup service account, which has never created an object before, created a user and added it to Domain Admins at four in the morning.',
+  evidence:[
+    ['04:10:02','Kerberos TGT for svc-backup from workstation subnet (normally DC subnet only)'],
+    ['04:11:30','Event 4720: user account adm_support01 created by svc-backup'],
+    ['04:12:04','Event 4728: adm_support01 added to Domain Admins'],
+    ['04:12:40','svc-backup password last changed: 1,340 days ago']
+  ],
+  enrich:[
+    { id:'e1', label:'Check where svc-backup authenticated from', cost:20, key:true,
+      result:'From a user workstation, not the backup infrastructure — the service account credential is being used by someone else.' },
+    { id:'e2', label:'Check for a change request', cost:20,
+      result:'No change ticket exists for creating an administrative account tonight.' },
+    { id:'e3', label:'Check what the new account has done', cost:20,
+      result:'adm_support01 has not signed in yet. It looks like persistence being set up for later.' }
+  ],
+  verdict:'true_positive',
+  required:['escalate_ir','disable_account','collect_forensics'],
+  ok:['revoke_sessions','reset_password','isolate_host','add_watchlist','notify_user'],
+  forbidden:['tune_rule','close_no_action'],
+  debrief:'Someone has the service account credential and is building persistence. Disable the account they created, page IR, and preserve the domain controller logs. Killing svc-backup itself can take backups down, so that call belongs to IR and the platform owner together — knowing what your containment breaks is part of the job.'
+},
+{
+  id:'ALT-4480', sev:'low', target:100,
+  title:'Phishing message reported by a user',
+  source:'Report Phishing button · Mail gateway', time:'05:38',
+  entities:{ Reporter:'v.machova', Sender:'payments@dhl-delivery-cz[.]net', Clicks:'0' },
+  summary:'An employee reported a parcel-delivery message before opening the link. The gateway confirms nobody in the organisation clicked it.',
+  evidence:[
+    ['05:31:00','Message delivered to 24 mailboxes'],
+    ['05:36:12','Reported via the Report Phishing button by v.machova'],
+    ['05:37:00','URL click telemetry: 0 clicks organisation-wide'],
+    ['05:37:30','Sender domain registered 4 days ago, SPF fail']
+  ],
+  enrich:[
+    { id:'e1', label:'Check click telemetry across the tenant', cost:20, key:true,
+      result:'Nobody clicked. The link is still live and would land on a credential harvesting page.' },
+    { id:'e2', label:'Check the other recipients', cost:20,
+      result:'The remaining 23 copies are still sitting in inboxes and can be pulled back.' },
+    { id:'e3', label:'Check sender reputation', cost:20,
+      result:'The domain and its IP show up in two phishing feeds from the last 48 hours.' }
+  ],
+  verdict:'true_positive',
+  required:['block_indicator','notify_user'],
+  ok:['add_watchlist','tune_rule','quarantine_file'],
+  forbidden:['isolate_host','disable_account','reset_password','escalate_ir','notify_hr_legal','close_no_action'],
+  debrief:'A quiet win. Block the domain, purge the other 23 copies, and reply to the reporter — people who get a thank-you report again, and reporting is the cheapest detection you own. No containment needed: nothing was clicked.'
+}
+];
+
+/* ---------- game state ---------- */
+const S = {
+  name:'', score:0, closed:0, correct:0, streak:0, best:0,
+  keyFinds:0, cleanCases:0, fastCases:0,
+  results:{}, badges:new Set(), current:null,
+  draft:{}   // per alert: {assigned, enriched:Set, verdict, actions:Set, t0, extra}
+};
+
+const RANKS = [
+  [0,'Tier 1 Trainee'],[150,'Junior Analyst'],[350,'SOC Analyst'],
+  [600,'Senior Analyst'],[900,'Threat Hunter'],[1250,'Incident Commander']
+];
+const BADGES = {
+  first_blood:  'First case closed',
+  perfect:      'Perfect triage',
+  streak3:      'Three in a row',
+  streak5:      'Five in a row',
+  fast:         'Under the clock',
+  digger:       'Thorough investigator',
+  proportionate:'Proportionate response',
+  full_shift:   'Full shift survived'
+};
+
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => { const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n; };
+
+/* ---------- start ---------- */
+$('#startBtn').onclick = start;
+$('#nameInput').addEventListener('keydown', e => { if(e.key==='Enter') start(); });
+
+function start(){
+  const v = $('#nameInput').value.trim();
+  S.name = v || 'Analyst';
+  $('#start').hidden = true;
+  $('#app').hidden = false;
+  $('#whoName').textContent = S.name;
+  $('#avatar').textContent = S.name.trim()[0].toUpperCase();
+  renderQueue(); renderCase(); renderStats();
+  window.scrollTo(0,0);
+}
+
+/* ---------- queue ---------- */
+function renderQueue(){
+  const list = $('#qlist'); list.innerHTML = '';
+  ALERTS.forEach(a => {
+    const r = S.results[a.id];
+    const b = el('button', 'alert' + (r ? ' done' : ''));
+    b.style.setProperty('--sev', `var(--sev-${a.sev})`);
+    b.setAttribute('aria-current', S.current === a.id ? 'true' : 'false');
+    b.innerHTML = `<div class="top"><span class="sev">${a.sev.toUpperCase()}</span>
+        ${r ? `<span class="tick ${r.verdictOk?'':'miss'}">${r.verdictOk?'✓':'!'} ${r.score}</span>`:''}
+        <span class="aid">${a.id}</span></div>
+      <h3>${a.title}</h3><p>${a.time} · ${a.source}</p>`;
+    b.onclick = () => openCase(a.id);
+    list.appendChild(b);
+  });
+}
+
+function openCase(id){
+  S.current = id;
+  if(!S.draft[id]) S.draft[id] = { assigned:false, enriched:new Set(), verdict:null, actions:new Set(), t0:null, extra:0 };
+  $('#grid').dataset.view = 'case';
+  renderQueue(); renderCase();
+  if(window.innerWidth <= 900) window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ---------- case panel ---------- */
+function renderCase(){
+  const wrap = $('#case');
+  if(!S.current){
+    wrap.innerHTML = `<div class="empty"><h3>Pick an alert to begin</h3>
+      <p>Highest severity first is a good habit, but read the queue before you commit.</p></div>`;
+    return;
+  }
+  const a = ALERTS.find(x => x.id === S.current);
+  const d = S.draft[a.id];
+  const done = S.results[a.id];
+
+  wrap.innerHTML = '';
+
+  /* header */
+  const head = el('div','case-head');
+  const back = el('button','backlink','← Back to queue');
+  back.onclick = () => { $('#grid').dataset.view = 'queue'; };
+  head.appendChild(back);
+  head.insertAdjacentHTML('beforeend',
+    `<span class="sev" style="color:var(--sev-${a.sev})">${a.sev.toUpperCase()} · ${a.id}</span>
+     <h2>${a.title}</h2>
+     <div class="meta"><span><b>Detected</b> ${a.time}</span><span><b>Source</b> ${a.source}</span>
+     ${Object.entries(a.entities).map(([k,v])=>`<span><b>${k}</b> ${v}</span>`).join('')}</div>`);
+  wrap.appendChild(head);
+
+  /* summary + evidence */
+  const s1 = el('div','sect');
+  s1.innerHTML = `<h3>What fired</h3><p class="hint">${a.summary}</p>
+    <div class="log">${a.evidence.map(([t,l])=>`<div><span class="k">${t}</span>  ${escapeHtml(l)}</div>`).join('')}</div>`;
+  wrap.appendChild(s1);
+
+  if(done){ wrap.appendChild(resultSection(a, done)); return; }
+
+  /* assign */
+  if(!d.assigned){
+    const s2 = el('div','sect');
+    s2.innerHTML = `<h3>Nobody owns this yet</h3>
+      <p class="hint">Assign the case to yourself to unlock investigation. The clock starts when you do.</p>`;
+    const btn = el('button','btn primary','Assign to me');
+    btn.onclick = () => { d.assigned = true; d.t0 = Date.now(); renderCase(); };
+    s2.appendChild(btn);
+    wrap.appendChild(s2);
+    return;
+  }
+
+  /* enrichment */
+  const s3 = el('div','sect');
+  s3.innerHTML = `<h3>Investigate</h3>
+    <p class="hint">Each lookup adds 20 seconds to your handling time. Pick what actually moves the decision.</p>`;
+  const chips = el('div','chips');
+  a.enrich.forEach(e => {
+    const used = d.enriched.has(e.id);
+    const c = el('button','chip'+(used?' used':''), `${e.label}<small>+20s</small>`);
+    c.onclick = () => { d.enriched.add(e.id); d.extra += 20; if(e.key) d.keyUsed = true; renderCase(); };
+    chips.appendChild(c);
+  });
+  s3.appendChild(chips);
+  a.enrich.filter(e => d.enriched.has(e.id)).forEach(e => {
+    s3.appendChild(el('div','finding', `<b>${e.label}</b>${e.result}`));
+  });
+  wrap.appendChild(s3);
+
+  /* verdict */
+  const s4 = el('div','sect');
+  s4.innerHTML = `<h3>Your verdict</h3><p class="hint">What is actually going on here?</p>`;
+  const opts = el('div','opts');
+  Object.entries(VERDICTS).forEach(([k,v]) => {
+    const o = el('button','opt', `<b>${v.label}</b><span>${v.desc}</span>`);
+    o.setAttribute('aria-pressed', d.verdict === k ? 'true':'false');
+    o.onclick = () => { d.verdict = k; renderCase(); };
+    opts.appendChild(o);
+  });
+  s4.appendChild(opts);
+  wrap.appendChild(s4);
+
+  /* actions */
+  const s5 = el('div','sect');
+  s5.innerHTML = `<h3>Response actions</h3>
+    <p class="hint">Take what the situation needs — no more. Overreacting costs the business and costs you points.</p>`;
+  const acts = el('div','actions');
+  Object.entries(ACTIONS).forEach(([k,v]) => {
+    const on = d.actions.has(k);
+    const b = el('button','act', `<span class="box">✓</span><span><b>${v.label}</b><span>${v.desc}</span></span>`);
+    b.setAttribute('aria-pressed', on ? 'true':'false');
+    b.onclick = () => { on ? d.actions.delete(k) : d.actions.add(k); renderCase(); };
+    acts.appendChild(b);
+  });
+  s5.appendChild(acts);
+  wrap.appendChild(s5);
+
+  /* close */
+  const s6 = el('div','sect');
+  const row = el('div','footer-row');
+  const close = el('button','btn primary','Close the case');
+  close.disabled = !d.verdict || d.actions.size === 0;
+  close.onclick = () => scoreCase(a);
+  row.appendChild(close);
+  const t = el('span','timer', 'handling time · live');
+  row.appendChild(t);
+  s6.appendChild(row);
+  if(!d.verdict || d.actions.size === 0){
+    s6.appendChild(el('p','hint','Pick a verdict and at least one action first.'));
+  }
+  wrap.appendChild(s6);
+  tickTimer(t, d);
+}
+
+function tickTimer(node, d){
+  clearInterval(window.__nwT);
+  const upd = () => {
+    const secs = Math.floor((Date.now() - d.t0)/1000) + d.extra;
+    node.textContent = `handling time · ${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`;
+  };
+  upd();
+  window.__nwT = setInterval(() => { if(document.body.contains(node)) upd(); else clearInterval(window.__nwT); }, 1000);
+}
+
+/* ---------- scoring ---------- */
+function scoreCase(a){
+  clearInterval(window.__nwT);
+  const d = S.draft[a.id];
+  const secs = Math.floor((Date.now() - d.t0)/1000) + d.extra;
+  const chosen = [...d.actions];
+  const hit = a.required.filter(r => chosen.includes(r));
+  const missed = a.required.filter(r => !chosen.includes(r));
+  const bad = chosen.filter(c => a.forbidden.includes(c));
+  const verdictOk = d.verdict === a.verdict;
+
+  const ledger = [];
+  let score = 0;
+
+  if(verdictOk){ score += 40; ledger.push(['Correct verdict: ' + VERDICTS[a.verdict].label, 40]); }
+  else ledger.push([`Wrong verdict — it was ${VERDICTS[a.verdict].label.toLowerCase()}`, 0]);
+
+  hit.forEach(h => { score += 14; ledger.push(['Took the right action: ' + ACTIONS[h].label, 14]); });
+  missed.forEach(m => { score -= 10; ledger.push(['Missed: ' + ACTIONS[m].label, -10]); });
+  bad.forEach(b => { score -= 12; ledger.push(['Should not have done this: ' + ACTIONS[b].label, -12]); });
+
+  if(d.keyUsed){ score += 8; ledger.push(['Found the decisive evidence', 8]); }
+  const fast = secs <= a.target && verdictOk;
+  if(fast){ score += 12; ledger.push(['Closed inside the target handling time', 12]); }
+
+  score = Math.max(0, score);
+
+  /* state */
+  S.score += score; S.closed++;
+  if(verdictOk){ S.correct++; S.streak++; S.best = Math.max(S.best, S.streak); } else S.streak = 0;
+  if(d.keyUsed) S.keyFinds++;
+  if(bad.length === 0) S.cleanCases++;
+  if(fast) S.fastCases++;
+
+  const perfect = verdictOk && missed.length === 0 && bad.length === 0;
+  const newBadges = [];
+  const give = k => { if(!S.badges.has(k)){ S.badges.add(k); newBadges.push(k); } };
+  if(S.closed === 1) give('first_blood');
+  if(perfect) give('perfect');
+  if(S.streak >= 3) give('streak3');
+  if(S.streak >= 5) give('streak5');
+  if(S.fastCases >= 3) give('fast');
+  if(S.keyFinds >= 5) give('digger');
+  if(S.cleanCases >= 6) give('proportionate');
+  if(S.closed === ALERTS.length) give('full_shift');
+
+  S.results[a.id] = { score, verdictOk, perfect, ledger, secs, chosen, missed, bad, verdict:d.verdict };
+
+  renderQueue(); renderStats(); renderCase();
+  showDebrief(a, S.results[a.id], newBadges);
+}
+
+function resultSection(a, r){
+  const s = el('div','sect');
+  s.innerHTML = `<h3>Closed · ${r.score} points</h3>
+    <p class="hint">Your verdict: ${VERDICTS[r.verdict].label}${r.verdictOk?'':` — correct answer was ${VERDICTS[a.verdict].label}`}. Handling time ${fmt(r.secs)}.</p>
+    <div class="note"><b>Debrief.</b> ${a.debrief}</div>`;
+  const b = el('button','btn ghost','Review the scoring again');
+  b.style.marginTop = '14px';
+  b.onclick = () => showDebrief(a, r, []);
+  s.appendChild(b);
+  return s;
+}
+
+/* ---------- debrief modal ---------- */
+function showDebrief(a, r, newBadges){
+  const root = $('#modalRoot');
+  root.innerHTML = '';
+  const scrim = el('div','scrim');
+  const m = el('div','modal');
+  m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true');
+
+  m.innerHTML = `
+    <div class="modal-head">
+      <div class="verdict-line">${a.id} · handling time ${fmt(r.secs)}</div>
+      <div class="score-big" style="color:${r.verdictOk?'var(--good)':'var(--sev-high)'}">+${r.score}</div>
+      <h2>${r.perfect ? 'Textbook triage' : r.verdictOk ? 'Right call' : 'Wrong call'}</h2>
+    </div>
+    <div class="modal-body">
+      <ul class="ledger">
+        ${r.ledger.map(([t,p]) => `<li>${t}<span class="pts ${p>=0?'plus':'minus'}">${p>=0?'+':''}${p}</span></li>`).join('')}
+      </ul>
+      <div class="note"><b>Debrief.</b> ${a.debrief}</div>
+      ${newBadges.length ? `<div class="badges">${newBadges.map(b=>`<span class="badge">★ ${BADGES[b]}</span>`).join('')}</div>` : ''}
+    </div>`;
+
+  const foot = el('div','modal-foot');
+  const next = ALERTS.find(x => !S.results[x.id]);
+  const b1 = el('button','btn primary', next ? 'Next alert' : 'See your shift report');
+  b1.onclick = () => { root.innerHTML=''; next ? openCase(next.id) : showReport(); };
+  const b2 = el('button','btn ghost','Back to queue');
+  b2.onclick = () => { root.innerHTML=''; $('#grid').dataset.view='queue'; };
+  foot.append(b1,b2);
+  m.appendChild(foot);
+  scrim.appendChild(m);
+  scrim.addEventListener('click', e => { if(e.target === scrim) root.innerHTML=''; });
+  root.appendChild(scrim);
+  b1.focus();
+}
+
+/* ---------- shift report ---------- */
+$('#statsBtn').onclick = showReport;
+
+function showReport(){
+  const acc = S.closed ? Math.round(S.correct / S.closed * 100) : 0;
+  const clean = S.closed ? Math.round(S.cleanCases / S.closed * 100) : 0;
+  const maxScore = ALERTS.length * 90;
+  const grade = S.score >= 700 ? 'Incident Commander material'
+              : S.score >= 520 ? 'Solid tier 1'
+              : S.score >= 340 ? 'Getting there'
+              : 'Keep practising';
+
+  const root = $('#modalRoot'); root.innerHTML='';
+  const scrim = el('div','scrim');
+  const m = el('div','modal');
+  m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true');
+  m.innerHTML = `
+    <div class="modal-head">
+      <div class="verdict-line">SHIFT REPORT · ${S.name}</div>
+      <div class="rank">${grade}</div>
+    </div>
+    <div class="modal-body">
+      <div class="bars">
+        ${bar('Cases closed', S.closed, ALERTS.length, `${S.closed}/${ALERTS.length}`, 'var(--accent)')}
+        ${bar('Verdict accuracy', acc, 100, acc+'%', 'var(--good)')}
+        ${bar('Proportionate responses', clean, 100, clean+'%', 'var(--sev-low)')}
+        ${bar('Score', S.score, maxScore, S.score+' XP', 'var(--xp)')}
+      </div>
+      <div class="note"><b>Longest streak:</b> ${S.best} correct verdicts in a row. <b>Rank:</b> ${rankFor(S.score)}.</div>
+      <div class="badges">
+        ${Object.entries(BADGES).map(([k,v]) =>
+          `<span class="badge ${S.badges.has(k)?'':'locked'}">${S.badges.has(k)?'★':'☆'} ${v}</span>`).join('')}
+      </div>
+    </div>`;
+  const foot = el('div','modal-foot');
+  const b1 = el('button','btn primary', S.closed < ALERTS.length ? 'Back to the queue' : 'Start a fresh shift');
+  b1.onclick = () => { root.innerHTML=''; if(S.closed >= ALERTS.length) location.reload(); else $('#grid').dataset.view='queue'; };
+  foot.appendChild(b1);
+  m.appendChild(foot);
+  scrim.appendChild(m);
+  scrim.addEventListener('click', e => { if(e.target === scrim) root.innerHTML=''; });
+  root.appendChild(scrim);
+  b1.focus();
+}
+
+function bar(label, val, max, txt, color){
+  const pct = Math.min(100, Math.round(val / max * 100));
+  return `<div class="row"><div class="lab"><span>${label}</span><span>${txt}</span></div>
+    <div class="track"><div class="fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+}
+
+/* ---------- stats strip ---------- */
+function renderStats(){
+  $('#sClosed').textContent = `${S.closed}/${ALERTS.length}`;
+  $('#sAcc').textContent = S.closed ? Math.round(S.correct/S.closed*100) + '%' : '—';
+  $('#sStreak').textContent = S.streak;
+  $('#sScore').textContent = S.score;
+  $('#sBadges').textContent = S.badges.size;
+
+  const rank = rankFor(S.score);
+  $('#whoRank').textContent = rank;
+  const idx = RANKS.findIndex(r => r[1] === rank);
+  const floor = RANKS[idx][0];
+  const ceil = RANKS[idx+1] ? RANKS[idx+1][0] : floor;
+  $('#xpLabel').textContent = S.score + ' XP';
+  $('#xpNext').textContent = RANKS[idx+1] ? (ceil - S.score) + ' to next rank' : 'top rank';
+  $('#xpFill').style.width = (RANKS[idx+1] ? (S.score-floor)/(ceil-floor)*100 : 100) + '%';
+}
+
+function rankFor(x){ let r = RANKS[0][1]; RANKS.forEach(([t,n]) => { if(x >= t) r = n; }); return r; }
+function fmt(s){ return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+document.addEventListener('keydown', e => { if(e.key === 'Escape') $('#modalRoot').innerHTML = ''; });
+</script>
+</body>
+</html>
