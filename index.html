@@ -333,13 +333,13 @@ document.getElementById('langBtnStart').onclick = toggleLang;
 /* ---------- response action catalogue ---------- */
 const ACTIONS = {
   isolate_host:     { en:{ label:'Isolate host',            desc:'Cut the machine off the network via EDR' },
-                       cs:{ label:'Izolovat stanici',        desc:'Odpojit zařízení od sítě přes EDR' } },
+                       cs:{ label:'Izolovat host',           desc:'Odpojit zařízení od sítě přes EDR' } },
   disable_account:  { en:{ label:'Disable account',         desc:'Block all sign-ins for the identity' },
                        cs:{ label:'Zablokovat účet',         desc:'Zakázat všechna přihlášení k identitě' } },
   reset_password:   { en:{ label:'Force password reset',    desc:'Invalidate the current credential' },
                        cs:{ label:'Vynutit reset hesla',     desc:'Zneplatnit stávající přihlašovací údaj' } },
   revoke_sessions:  { en:{ label:'Revoke sessions & tokens',desc:'Kill live sessions, refresh tokens, app passwords' },
-                       cs:{ label:'Zneplatnit relace a tokeny', desc:'Ukončit aktivní relace, refresh tokeny, hesla aplikací' } },
+                       cs:{ label:'Zneplatnit session a tokeny', desc:'Ukončit aktivní session, refresh tokeny, hesla aplikací' } },
   block_indicator:  { en:{ label:'Block the indicator',     desc:'Sinkhole the domain / drop the IP at the edge' },
                        cs:{ label:'Zablokovat indikátor',    desc:'Sinkhole domény / zahodit IP na perimetru' } },
   quarantine_file:  { en:{ label:'Quarantine the file',     desc:'Pull the binary or attachment out of reach' },
@@ -353,7 +353,7 @@ const ACTIONS = {
   escalate_ir:      { en:{ label:'Escalate to IR on-call',  desc:'Page tier 3 — this is bigger than a ticket' },
                        cs:{ label:'Eskalovat na IR pohotovost', desc:'Zavolat tier 3 — tohle je víc než tiket' } },
   add_watchlist:    { en:{ label:'Add to watchlist',        desc:'Raise monitoring on the entity for 14 days' },
-                       cs:{ label:'Přidat na sledovací seznam', desc:'Zvýšit monitoring entity na 14 dní' } },
+                       cs:{ label:'Přidat na watchlist',     desc:'Zvýšit monitoring entity na 14 dní' } },
   tune_rule:        { en:{ label:'Tune the detection',      desc:'Refine the rule so this stops firing' },
                        cs:{ label:'Doladit detekci',         desc:'Upravit pravidlo, ať to přestane střílet' } },
   close_no_action:  { en:{ label:'Close, no action needed', desc:'Nothing to contain here' },
@@ -364,9 +364,9 @@ function actD(k){ return ACTIONS[k][LANG].desc; }
 
 const VERDICTS = {
   true_positive:    { en:{ label:'True positive',  desc:'Real malicious activity' },
-                       cs:{ label:'Skutečný incident', desc:'Reálná škodlivá aktivita' } },
+                       cs:{ label:'True positive',      desc:'Reálná škodlivá aktivita' } },
   false_positive:   { en:{ label:'False positive', desc:'Detection logic was wrong' },
-                       cs:{ label:'Falešný poplach', desc:'Detekční logika se spletla' } },
+                       cs:{ label:'False positive',   desc:'Detekční logika se spletla' } },
   benign:           { en:{ label:'Authorised',     desc:'Real activity, but approved' },
                        cs:{ label:'Schválená aktivita', desc:'Reálná aktivita, ale povolená' } }
 };
@@ -375,12 +375,12 @@ function verD(k){ return VERDICTS[k][LANG].desc; }
 
 /* ---------- entity key labels ---------- */
 const ENTITY_LABELS_CS = {
-  Host:'Stanice', User:'Uživatel', Process:'Proces', Domain:'Doména', Src:'Zdroj',
+  Host:'Host', User:'Uživatel', Process:'Proces', Domain:'Doména', Src:'Zdroj',
   Target:'Cíl', 'Location A':'Místo A', 'Location B':'Místo B', Attempts:'Pokusy',
-  Pushes:'Notifikace', Result:'Výsledek', Volume:'Objem', Destination:'Cíl přenosu',
+  Pushes:'Push', Result:'Výsledek', Volume:'Objem', Destination:'Cíl přenosu',
   File:'Soubor', C2:'C2 server', Account:'Účet', 'New user':'Nový účet', Group:'Skupina',
-  Reporter:'Nahlásil', Sender:'Odesílatel', Clicks:'Kliknutí', Bucket:'Úložiště',
-  Change:'Změna', Owner:'Vlastník', Signatures:'Signatury', App:'Aplikace', Scope:'Oprávnění',
+  Reporter:'Nahlásil', Sender:'Odesílatel', Clicks:'Kliknutí', Bucket:'Bucket',
+  Change:'Změna', Owner:'Vlastník', Signatures:'Signatury', App:'Aplikace', Scope:'Scope',
   Terminated:'Ukončení PP', Access:'Přístup', Recipients:'Příjemci', Action:'Akce',
   Tool:'Nástroj', Requests:'Požadavky', CPU:'CPU', Files:'Soubory', Path:'Cesta'
 };
@@ -635,7 +635,7 @@ const ALERTS = [
       { label:'Zkontrolovat datum registrace domény', result:'Doména byla zaregistrována před dvěma dny s ochranou soukromí (privacy protection).' },
       { label:'Prohledat mail gateway pro stejný odkaz', result:'Stejnou zprávu dostalo dalších jedenáct uživatelů. Dva na ni kliknuli.' }
     ],
-    debrief:'Převzetí účtu, ne kompromitace stanice — izolace notebooku tady nic neřeší. Samotný reset hesla taky nestačí: bez zneplatnění relací a tokenů si útočník ukradenou relaci podrží. Resetuj, zneplatni, zablokuj doménu a najdi to pravidlo schránky.'
+    debrief:'Převzetí účtu, ne kompromitace stanice — izolace notebooku tady nic neřeší. Samotný reset hesla taky nestačí: bez zneplatnění session a tokenů si útočník ukradenou session podrží. Resetuj, zneplatni, zablokuj doménu a najdi to pravidlo schránky.'
   }
 },
 {
@@ -678,7 +678,7 @@ const ALERTS = [
       { label:'Zkontrolovat zranitelný plugin', result:'Web běží na pluginu formulářů s kritickou neautentizovanou chybou nahrávání souborů zveřejněnou před šesti hodinami, stále nezáplatovanou.' },
       { label:'Zkontrolovat další zasažené servery', result:'Další dva webové servery za stejným load balancerem běží na identické zranitelné verzi pluginu.' }
     ],
-    debrief:'Živý reverse shell, ne jen odložený soubor — odpoj stanici od sítě dřív, než operátor stihne cokoliv dalšího, karanténuj shell a udělej image, dokud je proces ještě v paměti. Zaplatuj nebo shoď plugin i na zbylých dvou serverech, než se z tohohle stanou tři incidenty místo jednoho.'
+    debrief:'Živý reverse shell, ne jen odložený soubor — odpoj host od sítě dřív, než operátor stihne cokoliv dalšího, karanténuj shell a udělej image, dokud je proces ještě v paměti. Záplatuj nebo shoď plugin i na zbylých dvou serverech, než se z tohohle stanou tři incidenty místo jednoho.'
   }
 },
 {
@@ -722,7 +722,7 @@ const ALERTS = [
       { label:'Porovnat device ID', result:'Obě přihlášení jdou ze stejného spravovaného, kompliantního zařízení se stejným hardwarovým ID.' },
       { label:'Kontaktovat nadřízeného uživatele', result:'Nadřízený potvrzuje, že j.benes je v Praze a pracuje dlouho do noci na vydání release.' }
     ],
-    debrief:'Stejné zařízení, stejná relace, firemní VPN výstup v Singapuru. Zablokovat inženýra o půlnoci kvůli artefaktu geo-IP stojí firmu reálné peníze — a pravidlo potřebuje výjimku pro VPN, ať příští analytik nepřijde o dalších dvacet minut.'
+    debrief:'Stejné zařízení, stejná session, firemní VPN výstup v Singapuru. Zablokovat inženýra o půlnoci kvůli artefaktu geo-IP stojí firmu reálné peníze — a pravidlo potřebuje výjimku pro VPN, ať příští analytik nepřijde o dalších dvacet minut.'
   }
 },
 {
@@ -764,7 +764,7 @@ const ALERTS = [
     enrich:[
       { label:'Zkontrolovat, zda se změnily přípony souborů', result:'Nezměnila se ani jedna přípona a nevznikly žádné nové soubory — obsah byl přečten a snapshot zapsán do zálohovacího repozitáře, nic nebylo zašifrováno.' },
       { label:'Zkontrolovat podpis procesu', result:'Podepsáno stejným certifikátem výrobce zálohovacího software jako na všech ostatních souborových serverech, odpovídá známým bezpečným hashům.' },
-      { label:'Zkontrolovat plán úloh', result:'Tato konkrétní stanice spouští plnou zálohu každou noc v 00:30; časování se nikdy neměnilo.' }
+      { label:'Zkontrolovat plán úloh', result:'Tento konkrétní host spouští plnou zálohu každou noc v 00:30; časování se nikdy neměnilo.' }
     ],
     debrief:'Hromadné rychlé čtení souborů vypadá pro heuristiku počítající jen objem I/O stejně jako šifrování — poznávacím znakem je, že se nic doopravdy nepřejmenovalo ani nezměnilo. Přidej hash a rozvrh zálohovacího agenta do výjimek pravidla, ať dnešní úloha někoho nebudí každou noc tenhle týden.'
   }
@@ -850,7 +850,7 @@ const ALERTS = [
     ],
     enrich:[
       { label:'Zkontrolovat požadovaný typ šifrování', result:'Každý tiket byl vyžádán s downgradem na RC4, i když je v celé doméně zapnuté AES — tikety se sbírají pro offline lámání.' },
-      { label:'Zkontrolovat, co uživatel d.marek dělal', result:'d.marek je finanční analytik bez důvodu enumerovat servisní účty; relace nevykazuje žádnou interaktivní aktivitu na klávesnici, odpovídá to skriptovanému nástroji.' },
+      { label:'Zkontrolovat, co uživatel d.marek dělal', result:'d.marek je finanční analytik bez důvodu enumerovat servisní účty; session nevykazuje žádnou interaktivní aktivitu na klávesnici, odpovídá to skriptovanému nástroji.' },
       { label:'Zkontrolovat předchozí podobné nárazy', result:'Podobná enumerace SPN se na tomto účtu ani stanici nikdy dřív neobjevila.' }
     ],
     debrief:'Tohle je Kerberoasting — levné na spuštění a zničující, pokud má byť jeden z těch servisních účtů slabé heslo. Resetuj přihlašovací údaje sklizených účtů, zachovej logy požadavků na tikety a zapoj IR, než někdo dolomí heslo offline.'
@@ -897,7 +897,7 @@ const ALERTS = [
       { label:'Zkontrolovat reputaci zdrojové IP', result:'Adresa je známý Tor exit node, na tomto tenantu dosud neviděný.' },
       { label:'Zavolat uživatelce', result:'Říká, že jí telefon nepřestával vibrovat, tak klepla na schválit, aby to přestalo. Nepřihlašuje se.' }
     ],
-    debrief:'Přihlašovací údaj byl ukradený už dřív; záplava se týkala jen druhého faktoru. Zneplatni relace, resetuj heslo a odeber ten podvodný autentizátor — a promluv si s uživatelkou, protože vzorec „schválím, ať to přestane“ je potřeba rozbít napříč celým tenantem.'
+    debrief:'Přihlašovací údaj byl ukradený už dřív; záplava se týkala jen druhého faktoru. Zneplatni session, resetuj heslo a odeber ten podvodný autentizátor — a promluv si s uživatelkou, protože vzorec „schválím, ať to přestane“ je potřeba rozbít napříč celým tenantem.'
   }
 },
 {
@@ -1115,7 +1115,7 @@ const ALERTS = [
       { label:'Zkontrolovat vydavatele a historii aplikace', result:'Neověřený vydavatel, zaregistrováno před pěti dny, žádný jiný tenant ji doposud neschválil.' },
       { label:'Zavolat uživateli', result:'z.novak si vzpomíná, že odsouhlasil výzvu k oprávněním při pokusu převést PDF z odkazu v textové zprávě.' }
     ],
-    debrief:'Heslo nebylo vůbec potřeba — souhlas s OAuth dal útočníkovi trvalý API přístup ke schránce, na který samotný reset hesla nedosáhne. Zruš oprávnění aplikace i relace, zablokuj jí možnost znovu získat souhlas a varuj 40 lidí, kteří právě dostali poštu z kompromitovaného, důvěryhodného účtu.'
+    debrief:'Heslo nebylo vůbec potřeba — souhlas s OAuth dal útočníkovi trvalý API přístup ke schránce, na který samotný reset hesla nedosáhne. Zruš oprávnění aplikace i session, zablokuj jí možnost znovu získat souhlas a varuj 40 lidí, kteří právě dostali poštu z kompromitovaného, důvěryhodného účtu.'
   }
 },
 {
@@ -1198,11 +1198,11 @@ const ALERTS = [
       'Latence databázových dotazů vzrostla 6×, zaznamenány timeouty na straně zákazníků'
     ],
     enrich:[
-      { label:'Zkontrolovat, jak se proces dostal na stanici', result:'Byl nasazen přes vystavené správcovské rozhraní databáze s výchozím přihlašovacím údajem, který je pořád aktivní — na všech ostatních stanicích záplatováno před dvěma týdny, jen tady ne.' },
+      { label:'Zkontrolovat, jak se proces dostal na host', result:'Byl nasazen přes vystavené správcovské rozhraní databáze s výchozím přihlašovacím údajem, který je pořád aktivní — na všech ostatních hostech záplatováno před dvěma týdny, jen tady ne.' },
       { label:'Zkontrolovat spojení na těžební pool', result:'Potvrzený pool Monery, aktivně odesílá shares — právě teď to generuje výnos pro toho, kdo to nasadil.' },
-      { label:'Zkontrolovat laterální šíření', result:'Žádná další stanice v segmentu zatím nevykazuje stejný proces ani odchozí vzor.' }
+      { label:'Zkontrolovat laterální šíření', result:'Žádný další host v segmentu zatím nevykazuje stejný proces ani odchozí vzor.' }
     ],
-    debrief:'Produkční databáze s timeouty pro zákazníky je dopad na byznys; nezáplatované správcovské rozhraní je kořenová příčina. Izoluj, ať se zastaví těžba i timeouty, stáhni binárku a udělej forenzní analýzu, než začneš stavět znovu — a ověř, že záplata, která tuhle stanici minula, se skutečně nasadí všude jinde.'
+    debrief:'Produkční databáze s timeouty pro zákazníky je dopad na byznys; nezáplatované správcovské rozhraní je kořenová příčina. Izoluj, ať se zastaví těžba i timeouty, stáhni binárku a udělej forenzní analýzu, než začneš stavět znovu — a ověř, že záplata, která tenhle host minula, se skutečně nasadí všude jinde.'
   }
 },
 {
@@ -1245,7 +1245,7 @@ const ALERTS = [
       { label:'Zkontrolovat, co skript skutečně dělá', result:'Zdrojový kód je v interním repozitáři — jen čte a zapisuje tikety přes interní API, nic připomínající chování trojského koně.' },
       { label:'Zkontrolovat poznámky výrobce AV k detekci', result:'Obecná heuristika výrobce je známá přehnaným spouštěním na Python binárkách zabalených PyInstallerem; existuje proces pro zařazení na allowlist.' }
     ],
-    debrief:'Podepsané, interní a opakovaný pachatel proti té samé obecné heuristice — tohle je problém balíčkovače výrobce AV, ne infekce. Pošli hash na allowlisting, ať příští release nestojí někoho dalšího stejných dvacet minut.'
+    debrief:'Podepsané, interní a opakovaný pachatel proti té samé obecné heuristice — tohle je problém s packerem výrobce AV, ne infekce. Pošli hash na allowlisting, ať příští release nestojí někoho dalšího stejných dvacet minut.'
   }
 },
 {
@@ -1454,13 +1454,13 @@ const ALERTS = [
     evidence:[
       'AV: PUA.RemoteAdmin.AnyDesk označeno na stanici HR-WS-009',
       'Nainstalováno doménovým účtem it-helpdesk, odpovídá otevřenému tiketu #48213',
-      'Vzdálená relace trvala 11 minut, ukončena normálně',
-      'Během relace nezaznamenán přenos souborů ani výzva k zadání přihlašovacích údajů'
+      'Vzdálená session trvala 11 minut, ukončena normálně',
+      'Během session nezaznamenán přenos souborů ani výzva k zadání přihlašovacích údajů'
     ],
     enrich:[
-      { label:'Zkontrolovat helpdeskový tiket', result:'Tiket #48213 je otevřený kvůli problému s ovladačem tiskárny přesně na této stanici, přiřazený technikovi, který relaci spustil.' },
+      { label:'Zkontrolovat helpdeskový tiket', result:'Tiket #48213 je otevřený kvůli problému s ovladačem tiskárny přesně na této stanici, přiřazený technikovi, který session spustil.' },
       { label:'Zkontrolovat, zda je tento RMM nástroj schválený', result:'Není to standardní firemní nástroj, ale je na seznamu schválených alternativ pro tuto konkrétní helpdeskovou frontu.' },
-      { label:'Zkontrolovat obsah relace na cokoliv neobvyklého', result:'Metadata záznamu obrazovky ukazují jen kroky přeinstalace ovladače, nic připomínající přístup k datům.' }
+      { label:'Zkontrolovat obsah session na cokoliv neobvyklého', result:'Metadata záznamu obrazovky ukazují jen kroky přeinstalace ovladače, nic připomínající přístup k datům.' }
     ],
     debrief:'Obecné signatury PUA chytají každý nástroj pro vzdálený přístup, schválený nebo ne — otevřený tiket a odpovídající účet technika je to, co tohle odlišuje od skutečného vniknutí přes RMM. Zúž pravidlo detekce tak, aby označovalo jen RMM nástroje, které nejsou na schváleném seznamu, ať helpdesk nespouští stejný poplach každou směnu.'
   }
@@ -1537,12 +1537,12 @@ const ALERTS = [
     title:'RDP vystavené do internetu kompromitováno po kampani hrubou silou',
     source:'Firewall + EDR · Korelovaná detekce',
     entities:{ Attempts:'3 600 za 6 hodin' },
-    summary:'Jump box zůstal po změně firewallového pravidla dostupný přes RDP z internetu. Po šesti hodinách útoku hrubou silou se jedno přihlášení podařilo a stejná relace okamžitě začala vypínat bezpečnostní nástroje.',
+    summary:'Jump box zůstal po změně firewallového pravidla dostupný přes RDP z internetu. Po šesti hodinách útoku hrubou silou se jedno přihlášení podařilo a stejná session okamžitě začala vypínat bezpečnostní nástroje.',
     evidence:[
       'Okno firewallové změny otevírá dočasné vystavení RDP kvůli už dokončené migraci',
       '3 600 neúspěšných RDP přihlášení z 91.219.x.x proti lokálním admin účtům',
       'Úspěšné přihlášení: lokální administrátor, z 91.219.x.x',
-      'Windows Defender i služba EDR zastaveny ze stejné relace'
+      'Windows Defender i služba EDR zastaveny ze stejné session'
     ],
     enrich:[
       { label:'Zkontrolovat, co se stalo hned po úspěšném přihlášení', result:'Útočník okamžitě vypnul oba endpointové bezpečnostní agenty — aktivně pracuje na tom, aby na stanici zůstal.' },
@@ -1563,7 +1563,7 @@ const S = {
 };
 
 const RANKS = [
-  [0,   { en:'Tier 1 Trainee',   cs:'Stážista úrovně 1' }],
+  [0,   { en:'Tier 1 Trainee',   cs:'Tier 1 stážista' }],
   [150, { en:'Junior Analyst',   cs:'Junior analytik' }],
   [350, { en:'SOC Analyst',      cs:'SOC analytik' }],
   [600, { en:'Senior Analyst',   cs:'Senior analytik' }],
